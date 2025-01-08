@@ -5,10 +5,11 @@ import numpy as np
 import requests
 import torch
 from tqdm import tqdm
-from preprocessing import DatasetAnalyzer, process_folder_metrics
+from preprocessing import DatasetAnalyzer
 from ink import process_single_image, process_folder, run_diagnostics
 from postprocessing import binarize_folder_images, control_stippling
 from models import Pix2Pix_Turbo
+import time
 
 MODEL_URL = "https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/model_10k.pkl?download=true"
 MODEL_PATH = "models/10k.pth"
@@ -103,11 +104,11 @@ def test_pipeline():
         test_dirs = setup_test_environment()
         
         # Download model if needed
-        try:
-            download_model(MODEL_URL, MODEL_PATH)
-        except Exception as e:
-            print(f"❌ Model download failed: {str(e)}")
-            raise
+        #try:
+            #download_model(MODEL_URL, MODEL_PATH)
+        #except Exception as e:
+            #print(f"❌ Model download failed: {str(e)}")
+            #raise
         
         # Test 1: Model Loading
         print("\n🔄 Test 1: Testing model loading...")
@@ -200,5 +201,16 @@ def test_pipeline():
         print("✅ Cleanup completed")
 
 if __name__ == "__main__":
+        
     check_cuda()
+    # Download model if needed
+    try:
+        download_model(MODEL_URL, MODEL_PATH)
+    except Exception as e:
+        print(f"❌ Model download failed: {str(e)}")
+        raise
+    starting_time = time.time()
     test_pipeline()
+    ending_time = time.time()
+
+    print(f"\n🕒 Total time taken: {ending_time - starting_time:.2f} seconds")

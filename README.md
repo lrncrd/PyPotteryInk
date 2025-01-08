@@ -32,7 +32,7 @@ As part of the **PyPottery** toolkit, `PyPotteryInk` is a deep learning applicat
 ## 📚 Documentation
 
 <div align="center">
-  <a href="https://lrncrd.github.io/PyPottery/PyPotteryInk/">
+  <a href="https://lrncrd.github.io/PyPotteryInk/">
     <img src="https://img.shields.io/badge/📖%20Read%20the%20Docs-PyPotteryInk-4A5568?style=for-the-badge&logo=read-the-docs&logoColor=white" alt="Documentation"/>
   </a>
 </div>
@@ -48,9 +48,16 @@ All models support custom fine-tuning for specific archaeological contexts or st
 
 ## ⚡ Benchmarks
 
-```
-Coming Soon!
-```
+
+| GPU                 | Mean processing time for $512 \cdot 512$ pixel patch (s) |
+| ------------------- | -------------------------------- |
+| 3070Ti (Windows 11) | 6.62                             |
+| 3060 (Windows 11)   | 21.29                            |
+| 3060 (WSL Ubuntu)   | 20.89                            |
+| T4 (Google Colab)   | 0.56                             |
+
+The benchmarks were performed using the `test.py` script. 
+
 
 ## 👥 Contributors
 

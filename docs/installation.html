@@ -309,18 +309,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="installation-overview" class="level1">
 <h1>Installation Overview</h1>
-<p>PyPotteryInk requires specific hardware and software components to function properly. This guide will walk you through the installation process step by step, ensuring you have everything needed to start processing archaeological drawings.</p>
+<p><code>PyPotteryInk</code> requires specific hardware and software components to function properly. This guide will walk you through the installation process step by step, ensuring you have everything needed to start processing archaeological drawings.</p>
 <section id="system-requirements" class="level2">
 <h2 class="anchored" data-anchor-id="system-requirements">System Requirements</h2>
-<p>Before installing PyPotteryInk, ensure your system meets these minimum requirements:</p>
+<p>Before installing <code>PyPotteryInk</code>, ensure your system meets these minimum requirements:</p>
 <section id="hardware-requirements" class="level3">
 <h3 class="anchored" data-anchor-id="hardware-requirements">Hardware Requirements</h3>
 <p>For model inference (using the tool):</p>
 <ul>
 <li>CPU: Modern multi-core processor (Intel i5/i7 or AMD Ryzen 5/7)</li>
 <li>RAM: 16GB minimum, 32GB recommended</li>
-<li>Storage: 2GB for the base installation and models</li>
-<li>GPU: NVIDIA GPU with 6GB VRAM (for optimal performance)</li>
+<li>Storage: 5GB for the base installation and models</li>
+<li>GPU: NVIDIA GPU with 8GB VRAM (for optimal performance)</li>
 </ul>
 <p>For model training or fine-tuning:</p>
 <ul>
@@ -331,7 +331,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="software-requirements" class="level3">
 <h3 class="anchored" data-anchor-id="software-requirements">Software Requirements</h3>
-<p>PyPotteryInk requires Python 3.9 or newer and depends on several deep learning frameworks:</p>
+<p><code>PyPotteryInk</code> requires Python 3.10 or newer and depends on several deep learning frameworks:</p>
 <ul>
 <li>CUDA Toolkit 11.8 or newer (for GPU support)</li>
 <li>PyTorch 2.0 or newer</li>
@@ -345,10 +345,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <h3 class="anchored" data-anchor-id="download-the-project">1. Download the Project</h3>
 <p>First, download the latest release from our GitHub repository. You can find the release package at:</p>
 <p><a href="https://github.com/yourusername/pypotteryink/releases" class="uri">https://github.com/yourusername/pypotteryink/releases</a></p>
+<div data-align="center">
+<p><a href="https://github.com/yourusername/pypotteryink/releases/latest"> <img src="https://img.shields.io/badge/⬇️%20Download%20Latest%20Release-PyPotteryInk-4A5568?style=for-the-badge&amp;logo=github&amp;logoColor=white" alt="Download Latest Release"> </a></p>
+</div>
 <p>After downloading, extract the package to your desired location. The folder structure should look like this:</p>
 <pre><code>pypotteryink/
 ├── requirements.txt
-├── examples/
+├── models/ # This folder will be created by running test.py
 ├── ink.py
 ├── models.py
 ├── preprocessing.py

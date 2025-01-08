@@ -301,7 +301,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="import-required-libraries" class="level1">
 <h1>Import Required Libraries</h1>
-<div id="6d5a3765" class="cell">
+<div id="97dccbd4" class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> ink <span class="im">import</span> process_folder, process_single_image</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> utils <span class="im">import</span> DatasetAnalyzer, process_image_metrics, </span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>                visualize_metrics_change, process_folder_metrics</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
@@ -352,7 +352,7 @@ Figure&nbsp;2: Direct model application showing artefacts. Note the missing dott
 <li>Non-empty ratio: Proportion of pixels above background threshold</li>
 </ol>
 <p>You can either analyse your own dataset to establish reference metrics or use our pre-computed metrics from the training dataset:</p>
-<div id="1d07fcd3" class="cell">
+<div id="5c527262" class="cell">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Option 1: Analyse your own dataset</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>analyzer <span class="op">=</span> DatasetAnalyzer()</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>model_stats <span class="op">=</span> analyzer.analyze_dataset(<span class="st">'PATH_TO_YOUR_DATASET'</span>)</span>
@@ -364,7 +364,7 @@ Figure&nbsp;2: Direct model application showing artefacts. Note the missing dott
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>model_stats <span class="op">=</span> analyzer.distributions</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>The distribution of these metrics can be visualized:</p>
-<div id="9c6209c9" class="cell">
+<div id="c90fbe23" class="cell">
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>analyzer.visualize_distributions_kde()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div id="fig-model_stats" class="quarto-float quarto-figure quarto-figure-center anchored" data-fig-align="center">
@@ -381,7 +381,7 @@ Figure&nbsp;3: Distribution of image metrics from the training dataset. Each plo
 <section id="preprocessing-pipeline" class="level1">
 <h1>Preprocessing Pipeline</h1>
 <p>The preprocessing pipeline adjusts images to match the statistical properties of the training dataset. Here’s how to process a single image:</p>
-<div id="133b9991" class="cell">
+<div id="a4c7f48b" class="cell">
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>original_image <span class="op">=</span> <span class="st">'PATH_TO_YOUR_IMAGE'</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>adjusted_image, adjusted_metrics <span class="op">=</span> process_image_metrics(original_image, model_stats)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
