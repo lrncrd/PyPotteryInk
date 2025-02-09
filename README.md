@@ -39,9 +39,11 @@ As part of the **PyPottery** toolkit, `PyPotteryInk` is a deep learning applicat
 
 ## 🤖 Available Models
 
-| Model | Description | Size | Link |
+| Model | Description | Checkpoint Size | Link |
 |-------|-------------|------|------|
 | **10k Model** | General-purpose model for pottery drawings | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/model_10k.pkl?download=true) |
+| **6h-MCG Model** | High-quality model for Bronze Age drawings | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MCG.pkl?download=true) |
+
 
 
 All models support custom fine-tuning for specific archaeological contexts or styles.
