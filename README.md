@@ -73,4 +73,6 @@ Developed with ❤️ by [Lorenzo Cardarelli](https://github.com/lrncrd)
 
 Based on img2img-turbo by [GaParmar](https://github.com/GaParmar/img2img-turbo)
 
+The original code was released under the MIT Licence. The changes made in this fork are released under the Apache License 2.0.
+
 ---
