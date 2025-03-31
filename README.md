@@ -11,6 +11,9 @@
 
 *Transform archaeological pottery drawings into publication-ready illustrations with AI*
 
+🚀 Try the [demo](https://githubtocolab.com/lrncrd/PyPotteryInk/blob/main/PyPotteryInk_example.ipynb) on Google Colab 🚀
+
+
 </div>
 
 ## 🎯 Overview
@@ -60,6 +63,38 @@ All models support custom fine-tuning for specific archaeological contexts or st
 
 The benchmarks were performed using the `test.py` script. 
 
+## 📢 AI Disclosure and Citation
+
+PyPotteryInk uses Generative AI to translate archaeological pottery drawings into publication-ready illustrations. To promote transparency about the use of Generative AI and proper attribution in scientific research, is required all users to include the following disclosure statement in any publication, presentation, or report that utilizes PyPotteryInk:
+
+```
+This research utilized PyPotteryInk (version X.X.X) for the AI-assisted translation of [number] pottery drawings. PyPotteryInk is a generative AI tool developed by Lorenzo Cardarelli (https://github.com/lrncrd/PyPotteryInk).
+```
+
+Where you need to specify the software version and the number of processed pottery drawings.
+
+### Usage Reporting
+
+By using PyPotteryInk, you agree to:
+
+1. Clearly indicate in your methods section which model was used (e.g., "10k Model", "6h-MCG Model" or a custom model)
+2. Specify the number of images processed with PyPotteryInk
+3. Include the version number of PyPotteryInk used in your research
+
+### Citation
+
+If you use PyPotteryInk in your research, please cite:
+
+```bibtex
+@software{cardarelli2025pypotteryink,
+  author = {Cardarelli, Lorenzo},
+  title = {PyPotteryInk: Transform archaeological pottery drawings into publication-ready illustrations with AI},
+  year = {2025},
+  url = {https://github.com/lrncrd/PyPotteryInk},
+  version = {0.0.1}
+}
+```
+
 
 ## 👥 Contributors
 
@@ -67,6 +102,8 @@ The benchmarks were performed using the `test.py` script.
 <a href="https://github.com/lrncrd">
   <img src="https://github.com/lrncrd.png" width="50px" alt="Lorenzo Cardarelli" style="border-radius: 50%"/>
 </a>
+
+
 
 Developed with ❤️ by [Lorenzo Cardarelli](https://github.com/lrncrd)
 </div>
