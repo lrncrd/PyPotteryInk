@@ -4,7 +4,7 @@
 
 <img src="imgs/pypotteryink.png" width="250"/>
 
-[![Version](https://img.shields.io/badge/version-0.0.1-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
+[![Version](https://img.shields.io/badge/version-0.0.2-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![Documentation](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![HuggingFace](https://img.shields.io/badge/🤗%20Models-PyPotteryInk-yellow.svg)](https://huggingface.co/lrncrd/PyPotteryInk)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -91,7 +91,7 @@ If you use PyPotteryInk in your research, please cite:
   title = {PyPotteryInk: Transform archaeological pottery drawings into publication-ready illustrations with AI},
   year = {2025},
   url = {https://github.com/lrncrd/PyPotteryInk},
-  version = {0.0.1}
+  version = {0.0.2}
 }
 ```
 

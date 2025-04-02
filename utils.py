@@ -128,3 +128,30 @@ def visualize_patches(image_path_or_pil, patch_size=512, overlap=64, save_path=N
         plt.close()
     else:
         plt.show()
+
+
+def print_disclosure_reminder():
+    """
+    Prints the AI disclosure reminder when PyPotteryInk is run.
+    This function should be called at the beginning of the main execution.
+    """
+    version = "0.0.2"  # Replace with version variable from your package
+    
+    print("\n" + "=" * 80)
+    print(" 📢 PYPOTTERYINK AI DISCLOSURE REMINDER ".center(80, "="))
+    print("=" * 80)
+    print(
+        f"\nYou are using PyPotteryInk version {version}, a Generative AI tool for translating\n"
+        "archaeological pottery drawings into publication-ready illustrations.\n\n"
+        "DISCLOSURE REQUIREMENT:\n"
+        "When publishing or presenting results that use PyPotteryInk, please include:\n"
+        "  1. The version of PyPotteryInk used\n"
+        "  2. The specific model used (e.g., '10k Model' or '6h-MCG Model')\n"
+        "  3. The number of images processed\n\n"
+        "Suggested citation format:\n"
+        f"\"This research utilized PyPotteryInk (version {version}) for the AI-assisted\n"
+        "translation of [number] pottery drawings. PyPotteryInk is a generative AI tool\n"
+        "developed by Lorenzo Cardarelli (https://github.com/lrncrd/PyPotteryInk).\"\n"
+    )
+    print("=" * 80)
+    print("\n")

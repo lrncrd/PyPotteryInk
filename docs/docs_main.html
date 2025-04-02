@@ -367,7 +367,8 @@ Figure&nbsp;2: This analysis shows how different contrast values affect the mode
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>    contrast_scale<span class="op">=</span><span class="fl">1.25</span>,            <span class="co"># Chosen based on diagnostic results</span></span>
 <span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    output_dir<span class="op">=</span><span class="st">"Montale_processed"</span>, <span class="co"># We define an output folder</span></span>
 <span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>    use_fp16<span class="op">=</span><span class="va">True</span>,                  <span class="co"># Enables faster processing</span></span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    upscale<span class="op">=</span><span class="dv">1</span>                       <span class="co"># Upscale the image (1: no upscaling)</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <p>The processing creates an organized output structure that helps us track and validate our results:</p>
 <pre class="plaintext"><code>Montale_processed/
 ├── comparisons/                # Before/after comparisons
@@ -408,6 +409,7 @@ Figure&nbsp;3: Side-by-side comparison showing the transformation from pencil dr
 <li><p>Pay attention to image resolution. The model works best with clear, well-scanned drawings. If your scans are too light or too dark, consider adjusting them before processing (see <a href="docs_preprocessing.html">preprocessing</a>).</p></li>
 <li><p>Monitor the processing logs. If you see many failed conversions, it might indicate issues with your input images or parameters.</p></li>
 <li><p>Review the comparison images carefully. They can help you spot any systematic issues that might need addressing.</p></li>
+<li><p>Upscaling can help achieve a better result, especially when dealing with complex decorations. Upscaling factor is just for processing. The upscaling factor is for processing only. It doesn’t affect the output size.</p></li>
 </ol>
 <div class="callout callout-style-default callout-important callout-titled">
 <div class="callout-header d-flex align-content-center">

@@ -11,7 +11,7 @@ from PIL import Image
 import random
 import time
 import datetime
-from utils import visualize_patches
+from utils import visualize_patches, print_disclosure_reminder
 
 ### remove warnings
 import warnings
@@ -327,7 +327,8 @@ def process_single_image(
     contrast_scale=1,
     return_pil=False,
     patch_size=512,
-    overlap=64 
+    overlap=64,
+    upscale=1, 
 ):
     """
     Process a single image with modified pix2pix_turbo using improved patch strategy.
@@ -357,6 +358,12 @@ def process_single_image(
         input_image = Image.open(input_image_path_or_pil).convert('RGB')
     else:
         input_image = input_image_path_or_pil.convert('RGB')
+
+    # Upscale image
+
+    input_image = input_image.resize((input_image.width * upscale, input_image.height * upscale), Image.LANCZOS)
+
+    original_size = (input_image.width, input_image.height)
 
     # Get dimensions
     width = input_image.width - input_image.width % 4
@@ -412,6 +419,8 @@ def process_single_image(
         else:
             bname = output_name if output_name else "output.png"
         output_path = os.path.join(output_dir, bname)
+                        # Back to original size
+        output_image = output_image.resize(original_size, Image.LANCZOS)
         print(f"\n✅ Processing complete! Saving to: {output_path}")
         output_image = output_image.convert('L')
         output_image = ImageEnhance.Contrast(output_image).enhance(1.5)
@@ -429,12 +438,14 @@ def process_folder(
     contrast_scale=1,
     patch_size=512,
     overlap=64,
-    file_extensions=('.jpg', '.jpeg', '.png')
+    file_extensions=('.jpg', '.jpeg', '.png'),
+    upscale=1,
 ):
     """
     Process a folder of images using improved patch strategy
     """
     # Initial setup and logging
+    print_disclosure_reminder()
     print(f"\n🚀 Initializing batch processing with pix2pix_turbo...")
     print(f"📁 Input folder: {input_folder}")
     print(f"📁 Model path: {model_path}")
@@ -444,6 +455,7 @@ def process_folder(
     print(f"  - Patch size: {patch_size}px")
     print(f"  - Overlap: {overlap}px")
     print(f"  - Contrast scale: {contrast_scale}")
+    print(f"  - Upscale: {upscale}x")
     print(f"  - Prompt: {prompt}")
 
     # Setup directories
@@ -491,6 +503,7 @@ def process_folder(
         log.write(f"- Patch size: {patch_size}px\n")
         log.write(f"- Overlap: {overlap}px\n")
         log.write(f"- Contrast scale: {contrast_scale}\n")
+        log.write(f"- Upscale: {upscale}x\n")
         log.write(f"- Prompt: {prompt}\n\n")
 
         # Process each image
@@ -505,9 +518,15 @@ def process_folder(
                 # Load image
                 print(f"📥 Loading image: {image_file}")
                 input_image = Image.open(input_path).convert('RGB')
+
+
                 original_size = (input_image.width, input_image.height)
                 print(f"  - Original size: {original_size}")
                 log.write(f"Original size: {original_size}\n")
+
+                # Upscale image
+                input_image = input_image.resize((input_image.width * upscale, input_image.height * upscale), Image.LANCZOS)
+                print(f"  - Upscaled size: {input_image.size}")
 
                 # Calculate dimensions
                 width = input_image.width - input_image.width % 4
@@ -553,6 +572,10 @@ def process_folder(
 
                 # Save output
                 output_filename = os.path.join(output_dir, image_file)
+
+                # Back to original size
+                output_image = output_image.resize(original_size, Image.LANCZOS)
+
                 output_image = output_image.convert('L')
                 output_image = ImageEnhance.Contrast(output_image).enhance(1.5)
                 output_image.save(output_filename)
