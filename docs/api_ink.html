@@ -334,7 +334,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>    return_pil: <span class="bu">bool</span> <span class="op">=</span> <span class="va">False</span>,</span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    patch_size: <span class="bu">int</span> <span class="op">=</span> <span class="dv">512</span>,</span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    overlap: <span class="bu">int</span> <span class="op">=</span> <span class="dv">64</span>,</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    upscale: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    upscale: <span class="bu">float</span> <span class="op">=</span> <span class="dv">1</span>,</span>
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> Union[<span class="bu">str</span>, Image.Image]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <p>This function handles the conversion of individual drawings, providing fine control over the processing parameters. Think of it as a digital artisan, carefully converting each drawing while maintaining archaeological accuracy.</p>
 <section id="core-parameters" class="level3">
@@ -371,7 +371,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </dd>
 <dt><code>upscale</code> · default: 1</dt>
 <dd>
-<p>Upscaling factor for processing. It doesn’t affect the output size</p>
+<p>Upscaling or downscaling factor for processing. It doesn’t affect the output size</p>
 </dd>
 </dl>
 </section>
@@ -397,7 +397,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    patch_size: <span class="bu">int</span> <span class="op">=</span> <span class="dv">512</span>,</span>
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    overlap: <span class="bu">int</span> <span class="op">=</span> <span class="dv">64</span>,</span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    file_extensions: <span class="bu">tuple</span> <span class="op">=</span> (<span class="st">'.jpg'</span>, <span class="st">'.jpeg'</span>, <span class="st">'.png'</span>),</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    upscale: <span class="bu">int</span> <span class="op">=</span> <span class="dv">1</span>,</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    upscale: <span class="bu">float</span> <span class="op">=</span> <span class="dv">1</span>,</span>
 <span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>) <span class="op">-&gt;</span> <span class="bu">dict</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <p>Batch processes a directory of archaeological drawings, maintaining consistency across the entire collection. The function tracks progress and generates detailed logs and comparisons.</p>
 <section id="core-parameters-1" class="level3">
@@ -426,7 +426,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </dd>
 <dt><code>upscale</code> · default: 1</dt>
 <dd>
-<p>Upscaling factor for processing. It doesn’t affect the output size</p>
+<p>Upscaling or downscaling factor for processing. It doesn’t affect the output size</p>
 </dd>
 </dl>
 </section>

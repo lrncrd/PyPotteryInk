@@ -177,3 +177,6 @@ cython_debug/
 /data
 
 *.ipynb
+*.psd
+
+PyPotteryInk_0.0.3

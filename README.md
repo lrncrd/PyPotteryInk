@@ -4,10 +4,13 @@
 
 <img src="imgs/pypotteryink.png" width="250"/>
 
-[![Version](https://img.shields.io/badge/version-0.0.2-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
+[![Version](https://img.shields.io/badge/version-0.0.3-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![Documentation](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![HuggingFace](https://img.shields.io/badge/🤗%20Models-PyPotteryInk-yellow.svg)](https://huggingface.co/lrncrd/PyPotteryInk)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.culher.2025.06.016-blue.svg)](https://doi.org/10.1016/j.culher.2025.06.016)
+
+
 
 *Transform archaeological pottery drawings into publication-ready illustrations with AI*
 
@@ -46,6 +49,7 @@ As part of the **PyPottery** toolkit, `PyPotteryInk` is a deep learning applicat
 |-------|-------------|------|------|
 | **10k Model** | General-purpose model for pottery drawings | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/model_10k.pkl?download=true) |
 | **6h-MCG Model** | High-quality model for Bronze Age drawings | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MCG.pkl?download=true) |
+| **6h-MC Model** | High-quality model for Protohistoric and Historic drawings | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MC.pkl?download=true) |
 
 
 
@@ -54,14 +58,13 @@ All models support custom fine-tuning for specific archaeological contexts or st
 ## ⚡ Benchmarks
 
 
-| GPU                 | Mean processing time for $512 \cdot 512$ pixel patch (s) |
+| GPU                 | Processing time for `test_image.jpg` (s) |
 | ------------------- | -------------------------------- |
-| 3070Ti (Windows 11) | 6.62                             |
-| 3060 (Windows 11)   | 21.29                            |
-| 3060 (WSL Ubuntu)   | 20.89                            |
-| T4 (Google Colab)   | 0.56                             |
+| 3070Ti (Windows 11) | 51.48                            |
+| T4 (Google Colab)   | 57.56                             |
 
-The benchmarks were performed using the `test.py` script. 
+The benchmarks were performed using the `process_single_image` function. 
+
 
 ## 📢 AI Disclosure and Citation
 
@@ -91,16 +94,34 @@ If you use PyPotteryInk in your research, please cite:
   title = {PyPotteryInk: Transform archaeological pottery drawings into publication-ready illustrations with AI},
   year = {2025},
   url = {https://github.com/lrncrd/PyPotteryInk},
-  version = {0.0.2}
+  version = {0.0.3}
+}
+```
+
+or 
+
+```bibtex
+@article{cardarelli_pypotteryink_2025,
+	title = {{PyPotteryInk}: One-step diffusion model for sketch to publication-ready archaeological drawings},
+	volume = {74},
+	issn = {1296-2074},
+	url = {https://www.sciencedirect.com/science/article/pii/S1296207425001268},
+	doi = {10.1016/j.culher.2025.06.016},
+	shorttitle = {{PyPotteryInk}},
+	pages = {300--310},
+	journaltitle = {Journal of Cultural Heritage},
+	author = {Cardarelli, Lorenzo},
+	date = {2025-07-01},
+	keywords = {Archaeological drawing, Diffusion models, Generative {AI}, Image-to-image translation, Pottery},
 }
 ```
 
 
 ## 👥 Contributors
 
-<div align="center">
-<a href="https://github.com/lrncrd">
-  <img src="https://github.com/lrncrd.png" width="50px" alt="Lorenzo Cardarelli" style="border-radius: 50%"/>
+
+<a href="https://github.com/lrncrd/PyPotteryInk/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=lrncrd/PyPotteryInk" />
 </a>
 
 
