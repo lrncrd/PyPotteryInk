@@ -180,3 +180,7 @@ cython_debug/
 *.psd
 
 PyPotteryInk_0.0.3
+
+venv*
+*.pkl
+temp_*

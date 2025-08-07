@@ -13,6 +13,11 @@ import time
 import datetime
 from utils import visualize_patches, print_disclosure_reminder
 
+# Configurazione dispositivo migliorata
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+use_fp16 = torch.cuda.is_available()  # FP16 solo su CUDA
+print(f"⚙️ Using device: {device} ({'FP16 enabled' if use_fp16 else 'FP32'})")
+
 ### remove warnings
 import warnings
 warnings.filterwarnings("ignore")
@@ -30,7 +35,7 @@ def run_diagnostics(
     """
     Run diagnostic visualizations before main processing.
     Creates a diagnostic folder with patch visualizations and contrast tests.
-    
+
     Args:
         input_folder (str): Folder containing images to process
         model_path (str): Path to the model
@@ -40,61 +45,67 @@ def run_diagnostics(
         num_sample_images (int): Number of sample images to use for diagnostics (max 5). Default: 5
         contrast_values (list): List of contrast values to test. Default: [0.5, 0.75, 1, 1.5, 2, 3]
         output_dir (str): Output directory for diagnostic images. Default: 'diagnostics'
-   
+
     Returns:
         None
     """
     print("\n🔍 Running pre-processing diagnostics...")
-    
+
     # Create diagnostics directory
     #diag_dir = os.path.join(output_dir, 'diagnostics')
     os.makedirs(output_dir, exist_ok=True)
-    
+
     # Get list of images
     image_files = []
     for ext in ['.jpg', '.jpeg', '.png']:
         image_files.extend([f for f in os.listdir(input_folder) if f.lower().endswith(ext)])
-    
+
     if not image_files:
         print("❌ No images found for diagnostics!")
         return False
-    
+
     # Select sample images
     num_samples = min(num_sample_images, len(image_files), 5)
     sample_images = random.sample(image_files, num_samples)
-    
+
     print(f"\n📊 Running diagnostics on {num_samples} sample images...")
-    
+
     # Initialize model for diagnostics
     print("🔄 Loading model for diagnostics...")
-    model = Pix2Pix_Turbo(pretrained_path=model_path)
+    model = Pix2Pix_Turbo(pretrained_path=model_path).to(device)
     model.set_eval()
-    model.half()  # Using FP16 for diagnostics
-    
+
+    # FP16 solo se disponibile
+    if use_fp16:
+        model.half()
+        print("🚀 Using FP16 precision")
+    else:
+        print("ℹ️ Using FP32 precision (FP16 not available on CPU)")
+
     for idx, img_file in enumerate(sample_images):
         print(f"\n🖼️ Analyzing sample image {idx+1}/{num_samples}: {img_file}")
         input_path = os.path.join(input_folder, img_file)
-        
+
         try:
             # 1. Patch visualization
             print("  📐 Generating patch visualization...")
             patch_viz_path = os.path.join(output_dir, f'patches_{idx+1}.png')
             visualize_patches(input_path, patch_size, overlap, patch_viz_path)
-            
+
             # 2. Contrast analysis
             print("  🎨 Analyzing contrast effects...")
             fig, ax = plt.subplots(len(contrast_values), 2, figsize=(10, 4*len(contrast_values)))
-            
+
             for i, value in enumerate(contrast_values):
                 # Load and process original image
                 my_img = Image.open(input_path).convert('RGB')
                 img_contrast = ImageEnhance.Contrast(my_img).enhance(value)
                 original_img_size = my_img.size
-                
+
                 # Display contrast-enhanced input
                 ax[i, 0].imshow(img_contrast)
                 ax[i, 0].set_ylabel(f"Contrast: {value}")
-                
+
                 # Process with model
                 print(f"    Processing contrast value {value}...")
                 res_img = process_single_image(
@@ -108,20 +119,20 @@ def run_diagnostics(
                     return_pil=True,
                     output_dir=None
                 )
-                
+
                 # Display model output
                 ax[i, 1].imshow(res_img.resize(original_img_size))
-                
+
                 # Remove axes
                 ax[i, 0].set_xticks([])
                 ax[i, 0].set_yticks([])
                 ax[i, 1].set_xticks([])
                 ax[i, 1].set_yticks([])
-            
+
             # Add titles
             ax[0, 0].set_title("Input with Contrast")
             ax[0, 1].set_title("Model Output")
-            
+
             # Save contrast analysis
             contrast_path = os.path.join(output_dir, f'contrast_analysis_{idx+1}.png')
             ###
@@ -129,42 +140,42 @@ def run_diagnostics(
             ###
             plt.savefig(contrast_path, bbox_inches='tight', dpi=300)
             plt.close()
-            
+
             # 3. Generate summary info
             print("  📝 Generating image summary...")
             img = Image.open(input_path)
             summary = {
                 "filename": img_file,
                 "original_size": img.size,
-                "num_patches": ((img.width + patch_size - overlap - 1) // (patch_size - overlap)) * 
+                "num_patches": ((img.width + patch_size - overlap - 1) // (patch_size - overlap)) *
                               ((img.height + patch_size - overlap - 1) // (patch_size - overlap)),
                 "estimated_memory": f"{(img.width * img.height * 4) / (1024*1024):.2f}MB"
             }
-            
+
             # Save summary to text file
             with open(os.path.join(output_dir, f'summary_{idx+1}.txt'), 'w') as f:
                 for key, value in summary.items():
                     f.write(f"{key}: {value}\n")
-            
+
         except Exception as e:
             print(f"❌ Error during diagnostics for {img_file}: {str(e)}")
             continue
-    
+
     print("\n✅ Diagnostics complete!")
     print(f"📁 Results saved in: {output_dir}")
 
-   
+
 
 def calculate_patches(width, height, patch_size=512, overlap=64):
     """
     Calculate patch coordinates and dimensions for image processing.
-    
+
     Args:
         width (int): Image width
         height (int): Image height
         patch_size (int): Size of each patch. Default: 512
         overlap (int): Overlap between patches. Default: 64
-        
+
     Returns:
         list: List of patch information dictionaries containing:
             - x_start: Starting x coordinate
@@ -175,38 +186,38 @@ def calculate_patches(width, height, patch_size=512, overlap=64):
             - col: Column number
     """
     stride = patch_size - overlap
-    
+
     # Calculate patches per row and number of rows
     patches_per_row = (width - overlap) // (patch_size - overlap)
     if width > patches_per_row * (patch_size - overlap) + overlap:
         patches_per_row += 1
-    
+
     num_rows = (height - overlap) // (patch_size - overlap)
     if height > num_rows * (patch_size - overlap) + overlap:
         num_rows += 1
-    
+
     patches = []
-    
+
     for row in range(num_rows):
         for col in range(patches_per_row):
             # Calculate base coordinates
             x_start = col * stride
             y_start = row * stride
-            
+
             # Handle last column
             if col == patches_per_row - 1:
                 x_end = width
                 x_start = max(0, x_end - patch_size)
             else:
                 x_end = min(x_start + patch_size, width)
-            
+
             # Handle last row
             if row == num_rows - 1:
                 y_end = height
                 y_start = max(0, y_end - patch_size)
             else:
                 y_end = min(y_start + patch_size, height)
-            
+
             patch_info = {
                 'x_start': x_start,
                 'y_start': y_start,
@@ -216,7 +227,7 @@ def calculate_patches(width, height, patch_size=512, overlap=64):
                 'col': col
             }
             patches.append(patch_info)
-    
+
     return patches, patches_per_row, num_rows
 
 
@@ -224,35 +235,35 @@ def calculate_patches(width, height, patch_size=512, overlap=64):
 def calculate_patches(width, height, patch_size=512, overlap=64):
     """
     Calculate patch coordinates and dimensions for image processing.
-    
+
     Args:
         width (int): Image width
         height (int): Image height
         patch_size (int): Size of each patch. Default: 512
         overlap (int): Overlap between patches. Default: 64
-        
+
     Returns:
         tuple: (total_patches, patches_per_row, num_rows)
     """
     stride = patch_size - overlap
-    
+
     # Calculate patches per row and number of rows
     patches_per_row = (width - overlap) // (patch_size - overlap)
     if width > patches_per_row * (patch_size - overlap) + overlap:
         patches_per_row += 1
-    
+
     num_rows = (height - overlap) // (patch_size - overlap)
     if height > num_rows * (patch_size - overlap) + overlap:
         num_rows += 1
 
     total_patches = patches_per_row * num_rows
-    
+
     return total_patches, patches_per_row, num_rows
 
 def get_patch_coordinates(idx, patches_per_row, num_rows, width, height, patch_size, overlap):
     """
     Calculate coordinates for a specific patch.
-    
+
     Args:
         idx (int): Patch index
         patches_per_row (int): Number of patches per row
@@ -261,51 +272,51 @@ def get_patch_coordinates(idx, patches_per_row, num_rows, width, height, patch_s
         height (int): Image height
         patch_size (int): Size of each patch
         overlap (int): Overlap between patches
-        
+
     Returns:
         tuple: (x_start, y_start, x_end, y_end, row, col)
     """
     stride = patch_size - overlap
     row = idx // patches_per_row
     col = idx % patches_per_row
-    
+
     # Calculate base coordinates
     x_start = col * stride
     y_start = row * stride
-    
+
     # Handle last column
     if col == patches_per_row - 1:
         x_end = width
         x_start = max(0, x_end - patch_size)
     else:
         x_end = min(x_start + patch_size, width)
-    
+
     # Handle last row
     if row == num_rows - 1:
         y_end = height
         y_start = max(0, y_end - patch_size)
     else:
         y_end = min(y_start + patch_size, height)
-    
+
     return x_start, y_start, x_end, y_end, row, col
 
 def create_blend_mask(patch_width, patch_height, row, col, overlap):
     """
     Create a blending mask for patch seamless integration.
-    
+
     Args:
         patch_width (int): Width of the patch
         patch_height (int): Height of the patch
         row (int): Row number of the patch
         col (int): Column number of the patch
         overlap (int): Overlap size between patches
-        
+
     Returns:
         PIL.Image: Blending mask
     """
     if row == 0 and col == 0:
         return None
-        
+
     mask = Image.new('L', (patch_width, patch_height), 255)
     for k in range(overlap):
         alpha = int(255 * k / overlap)
@@ -313,7 +324,7 @@ def create_blend_mask(patch_width, patch_height, row, col, overlap):
             mask.paste(alpha, (k, 0, k+1, patch_height))
         if row > 0:  # Blend top edge
             mask.paste(alpha, (0, k, patch_width, k+1))
-    
+
     return mask
 
 
@@ -328,7 +339,7 @@ def process_single_image(
     return_pil=False,
     patch_size=512,
     overlap=64,
-    upscale=1, 
+    upscale=1,
 ):
     """
     Process a single image with modified pix2pix_turbo using improved patch strategy.
@@ -338,7 +349,8 @@ def process_single_image(
     print(f"\n🚀 Initializing pix2pix_turbo processing...")
     print(f"📁 Model path: {model_path}")
     print(f"⚙️ Configuration:")
-    print(f"  - FP16 mode: {use_fp16}")
+    print(f"  - Device: {device}")
+    print(f"  - FP16 mode: {use_fp16 and torch.cuda.is_available()}")
     print(f"  - Patch size: {patch_size}px")
     print(f"  - Overlap: {overlap}px")
     print(f"  - Contrast scale: {contrast_scale}")
@@ -349,10 +361,13 @@ def process_single_image(
         print(f"📁 Output directory created: {output_dir}")
 
     # Initialize model (unchanged)
-    model = Pix2Pix_Turbo(pretrained_path=model_path)
+    model = Pix2Pix_Turbo(pretrained_path=model_path).to(device)
     model.set_eval()
-    if use_fp16:
+    # FP16 solo se disponibile
+    if use_fp16 and torch.cuda.is_available():
         model.half()
+    elif use_fp16:
+        print("⚠️ FP16 requested but not available on CPU, using FP32 instead")
 
     # Process input image
     if isinstance(input_image_path_or_pil, str):
@@ -382,23 +397,23 @@ def process_single_image(
 
     # Initialize output
     output_image = Image.new('RGB', (width, height))
-    
+
     # Calculate patches
     total_patches, patches_per_row, num_rows = calculate_patches(width, height, patch_size, overlap)
-    
+
     try:
         with torch.no_grad():
             for idx in tqdm(range(total_patches), desc=f"Processing image"):
                 # Get patch coordinates
                 x_start, y_start, x_end, y_end, row, col = get_patch_coordinates(
                     idx, patches_per_row, num_rows, width, height, patch_size, overlap)
-                
+
                 # Extract and process patch
                 patch = input_image.crop((x_start, y_start, x_end, y_end))
                 patch = ImageEnhance.Contrast(patch).enhance(contrast_scale)
-                
-                c_t = F.to_tensor(patch).unsqueeze(0).cuda()
-                if use_fp16:
+
+                c_t = F.to_tensor(patch).unsqueeze(0).to(device)
+                if use_fp16 and torch.cuda.is_available():
                     c_t = c_t.half()
 
                 # Run model
@@ -410,7 +425,8 @@ def process_single_image(
                 output_image.paste(patch_pil, (x_start, y_start), mask)
 
                 del c_t, output_patch
-                torch.cuda.empty_cache()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
 
     except Exception as e:
         print(f"\n❌ Error during processing: {str(e)}")
@@ -418,7 +434,8 @@ def process_single_image(
     finally:
         print("\n🧹 Cleaning up resources...")
         gc.collect()
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     if return_pil:
         print(f"\n✅ Processing complete! Returning PIL image \n ---------------------------------")
@@ -437,7 +454,7 @@ def process_single_image(
         output_image.save(output_path)
         print(f"💾 Image saved successfully")
         return output_path
-    
+
 
 def process_folder(
     input_folder,
@@ -472,25 +489,27 @@ def process_folder(
     os.makedirs(output_dir, exist_ok=True)
     log_dir = os.path.join(output_dir, 'logs')
     os.makedirs(log_dir, exist_ok=True)
-    
+
     # Get list of images
     image_files = []
     for ext in file_extensions:
         image_files.extend([f for f in os.listdir(input_folder) if f.lower().endswith(ext)])
-    
+
     if not image_files:
         print("❌ No images found in input folder!")
         return
-    
+
     print(f"\n📸 Found {len(image_files)} images to process")
 
     # Initialize model
     print("\n🔄 Loading model...")
     model = Pix2Pix_Turbo(pretrained_path=model_path)
     model.set_eval()
-    if use_fp16:
+    if use_fp16 and torch.cuda.is_available():
         print("🚀 Converting model to FP16")
         model.half()
+    elif use_fp16:
+        print("⚠️ FP16 requested but not available on CPU, using FP32 instead")
     print("✅ Model loaded successfully")
 
     # Process statistics
@@ -501,7 +520,7 @@ def process_folder(
 
     # Create log file
     log_file = os.path.join(log_dir, f'processing_log_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.txt')
-    
+
     with open(log_file, 'w') as log:
         # Write initial configuration to log
         log.write(f"Processing started at: {datetime.datetime.now()}\n")
@@ -509,7 +528,7 @@ def process_folder(
         log.write(f"- Input folder: {input_folder}\n")
         log.write(f"- Output directory: {output_dir}\n")
         log.write(f"- Model path: {model_path}\n")
-        log.write(f"- FP16 mode: {use_fp16}\n")
+        log.write(f"- FP16 mode: {use_fp16 and torch.cuda.is_available()}\n")
         log.write(f"- Patch size: {patch_size}px\n")
         log.write(f"- Overlap: {overlap}px\n")
         log.write(f"- Contrast scale: {contrast_scale}\n")
@@ -521,9 +540,9 @@ def process_folder(
             input_path = os.path.join(input_folder, image_file)
             print(f"\n\n🖼️ Processing image {idx}/{len(image_files)}: {image_file}")
             log.write(f"\nProcessing image {idx}/{len(image_files)}: {image_file}\n")
-            
+
             start_time = time.time()
-            
+
             try:
                 # Load image
                 print(f"📥 Loading image: {image_file}")
@@ -556,7 +575,7 @@ def process_folder(
 
                 # Initialize output
                 output_image = Image.new('RGB', (width, height))
-                
+
                 # Calculate patches using utility function
                 total_patches, patches_per_row, num_rows = calculate_patches(width, height, patch_size, overlap)
                 print(f"🧩 Processing {total_patches} patches ({patches_per_row}x{num_rows})")
@@ -573,9 +592,9 @@ def process_folder(
                         # Process patch
                         patch = input_image.crop((x_start, y_start, x_end, y_end))
                         patch = ImageEnhance.Contrast(patch).enhance(contrast_scale)
-                        
-                        c_t = F.to_tensor(patch).unsqueeze(0).cuda()
-                        if use_fp16:
+
+                        c_t = F.to_tensor(patch).unsqueeze(0).to(device)
+                        if use_fp16 and torch.cuda.is_available():
                             c_t = c_t.half()
 
                         # Run model
@@ -598,16 +617,16 @@ def process_folder(
                 output_image = output_image.convert('L')
                 output_image = ImageEnhance.Contrast(output_image).enhance(1.5)
                 output_image.save(output_filename)
-                
+
                 end_time = time.time()
                 processing_time = end_time - start_time
                 processing_times.append(processing_time)
-                
+
                 print(f"✅ Saved: {output_filename}")
                 print(f"⏱️ Processing time: {processing_time:.2f}s")
                 log.write(f"Processing time: {processing_time:.2f}s\n")
                 log.write("Status: Success\n")
-                
+
                 successful_conversions += 1
 
             except Exception as e:
@@ -643,10 +662,10 @@ def process_folder(
         print("\n⚠️ Failed files:")
         for file in failed_files:
             print(f"  - {file}")
-    
+
     print(f"\n📝 Detailed log saved to: {log_file}")
     print("\n🏁 Batch processing complete!")
-    
+
     # Generate comparison visualizations
     print("\n📊 Generating comparison visualizations...")
     comparison_dir = os.path.join(output_dir, 'comparisons')
@@ -657,29 +676,29 @@ def process_folder(
         if image_file not in failed_files:
             try:
                 print(f"\rGenerating comparison {idx}/{len(image_files)}", end="")
-                
+
                 # Load original and processed images
                 input_path = os.path.join(input_folder, image_file)
                 output_path = os.path.join(output_dir, image_file)
-                
+
                 # Create comparison plot
                 fig, ax = plt.subplots(1, 2, figsize=(15, 7))
-                
+
                 # Original image
                 image_input = Image.open(input_path).convert('RGB')
                 ax[0].imshow(image_input)
                 ax[0].axis('off')
                 ax[0].set_title('Original Image', pad=20)
-                
+
                 # Processed image
                 image_output = Image.open(output_path)
                 ax[1].imshow(image_output, cmap='gray')
                 ax[1].axis('off')
                 ax[1].set_title('Processed Image', pad=20)
-                
+
                 # Add main title
                 plt.suptitle(f'Comparison for {image_file}\nSize: {image_input.size}', y=1.05)
-                
+
                 # Save comparison
                 comparison_path = os.path.join(comparison_dir, f'comparison_{image_file}')
                 plt.savefig(comparison_path, bbox_inches='tight', dpi=300, pad_inches=0.5)
@@ -690,7 +709,7 @@ def process_folder(
                 continue
 
     print(f"\n✅ Comparison visualizations saved in: {comparison_dir}")
-    
+
     # Return results
     results = {
         'successful': successful_conversions,
@@ -700,5 +719,5 @@ def process_folder(
         'log_file': log_file,
         'comparison_dir': comparison_dir
     }
-    
+
     return results
