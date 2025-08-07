@@ -184,3 +184,4 @@ PyPotteryInk_0.0.3
 venv*
 *.pkl
 temp_*
+output

@@ -2,7 +2,9 @@ import gradio as gr
 import os
 import shutil
 from pathlib import Path
-
+from hardware_check import run_hardware_check
+import requests
+from pathlib import Path
 # Assumiamo che lo script precedente sia salvato in un file chiamato `processor.py`
 # Qui importiamo le funzioni principali
 # from processor import run_diagnostics, process_folder
@@ -11,6 +13,69 @@ from pathlib import Path
 # Salva il codice fornito nel file `processor.py` nella stessa directory.
 
 from ink import run_diagnostics, process_folder  # Assicurati che il file sia salvato
+
+# Configurazione modelli
+MODELS = {
+    "10k Model": {
+        "description": "General-purpose model for pottery drawings",
+        "size": "38.3MB",
+        "url": "https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/model_10k.pkl?download=true",
+        "filename": "model_10k.pkl"
+    },
+    "6h-MCG Model": {
+        "description": "High-quality model for Bronze Age drawings",
+        "size": "38.3MB",
+        "url": "https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MCG.pkl?download=true",
+        "filename": "6h-MCG.pkl"
+    },
+    "6h-MC Model": {
+        "description": "High-quality model for Protohistoric and Historic drawings",
+        "size": "38.3MB",
+        "url": "https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MC.pkl?download=true",
+        "filename": "6h-MC.pkl"
+    },
+    "4h-PAINT Model": {
+        "description": "Tailored model for Historic and painted pottery",
+        "size": "38.3MB",
+        "url": "https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/4h-PAINT.pkl?download=true",
+        "filename": "4h-PAINT.pkl"
+    }
+}
+
+# Crea la cartella models se non esiste
+MODELS_DIR = "models"
+os.makedirs(MODELS_DIR, exist_ok=True)
+
+def download_model(model_name):
+    """Scarica il modello selezionato se non esiste già"""
+    model_info = MODELS[model_name]
+    model_path = os.path.join(MODELS_DIR, model_info["filename"])
+
+    if not os.path.exists(model_path):
+        try:
+            print(f"Downloading {model_name}...")
+            response = requests.get(model_info["url"], stream=True)
+            response.raise_for_status()
+
+            with open(model_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+            print(f"{model_name} downloaded successfully!")
+            return model_path
+        except Exception as e:
+            print(f"Error downloading {model_name}: {str(e)}")
+            return None
+    else:
+        print(f"{model_name} already exists, skipping download")
+        return model_path
+
+def get_model_dropdown():
+    """Crea la descrizione per il dropdown"""
+    choices = []
+    for name, info in MODELS.items():
+        choices.append(f"{name} - {info['description']}")
+    return choices
 
 # Directory temporanee
 TEMP_INPUT = "temp_input"
@@ -103,7 +168,7 @@ def run_gradio_processing(input_images, model_path, prompt, output_dir, use_fp16
         )
 
         # Genera zip della cartella output
-        shutil.make_archive("processed_images", 'zip', output_dir)
+        # shutil.make_archive("processed_images", 'zip', output_dir)
 
         summary = (
             f"✅ Elaborazione completata!\n"
@@ -117,6 +182,12 @@ def run_gradio_processing(input_images, model_path, prompt, output_dir, use_fp16
         return f"❌ Errore durante l'elaborazione: {str(e)}", None, None
 
 
+def run_hardware_check():
+    """Funzione wrapper per il check hardware"""
+    checker = HardwareChecker()
+    return checker.generate_report()
+
+
 # --- INTERFACCIA GRADIO ---
 with gr.Blocks(title="🖼️ Pix2Pix_Turbo Image Enhancer") as demo:
     gr.Markdown("""
@@ -125,14 +196,59 @@ with gr.Blocks(title="🖼️ Pix2Pix_Turbo Image Enhancer") as demo:
     """)
 
     with gr.Tabs():
-        # TAB 1: Diagnostica
+        # TAB 1: Hardware
+        with gr.Tab("🛠️ Verifica Hardware"):
+            gr.Markdown("""
+            ## Verifica le specifiche del tuo computer
+            Questo strumento richiede risorse significative. Verifica che il tuo hardware sia adeguato.
+            """)
+            hw_btn = gr.Button("🔍 Analizza Hardware", variant="primary")
+            hw_report = gr.Markdown()
+            hw_btn.click(fn=run_hardware_check, outputs=hw_report)
+
+            gr.Markdown("""
+            ### Requisiti consigliati:
+            - **GPU:** NVIDIA con almeno 8GB VRAM (minimo 4GB)
+            - **CPU:** 4+ core moderni
+            - **RAM:** 16GB (minimo 8GB)
+            - **Disco:** SSD veloce (NVMe consigliato)
+
+            ### Note importanti:
+            - L'uso della GPU è fondamentale per prestazioni accettabili
+            - Su portatili, assicurarsi di:
+              - Usare l'alimentazione collegata
+              - Avere una buona ventilazione
+              - Considerare una base di raffreddamento
+            """)
+
+        # TAB 2: Diagnostica
         with gr.Tab("🔍 Diagnostica"):
             gr.Markdown("Esegui test preliminari: visualizzazione patch e confronto contrasto.")
             with gr.Row():
                 diag_input = gr.File(file_count="multiple", label="Carica immagini per diagnostica", type="filepath")
             with gr.Row():
-                diag_model = gr.Textbox(label="Percorso del modello (file .pth)", value="./6h-MC.pkl")
+                # diag_model = gr.Textbox(label="Percorso del modello (file .pth)", value="./6h-MC.pkl")
+                model_dropdown = gr.Dropdown(
+                    label="Seleziona modello",
+                    choices=get_model_dropdown(),
+                    value="6h-MC Model - High-quality model for Protohistoric and Historic drawings (38.3MB)"
+                )
                 diag_prompt = gr.Textbox(label="Prompt", value="make it ready for publication")
+            # Aggiungi questo componente nascosto per il percorso del modello
+            model_path_hidden = gr.Textbox(visible=False)
+            # Quando si seleziona un modello, scaricalo se necessario
+            def on_model_select(selection):
+                # Estrai il nome del modello dalla selezione
+                model_name = selection.split(" - ")[0]
+                path = download_model(model_name)
+                return path if path else ""
+
+            model_dropdown.change(
+                fn=on_model_select,
+                inputs=model_dropdown,
+                outputs=model_path_hidden
+            )
+
             with gr.Row():
                 diag_patch_size = gr.Slider(minimum=256, maximum=1024, value=512, step=64, label="Patch Size")
                 diag_overlap = gr.Slider(minimum=0, maximum=128, value=64, step=8, label="Overlap")
@@ -147,18 +263,30 @@ with gr.Blocks(title="🖼️ Pix2Pix_Turbo Image Enhancer") as demo:
 
             diag_button.click(
                 fn=run_gradio_diagnostics,
-                inputs=[diag_input, diag_model, diag_prompt, diag_patch_size, diag_overlap, diag_contrast],
+                inputs=[diag_input, model_path_hidden, diag_prompt, diag_patch_size, diag_overlap, diag_contrast],
                 outputs=[diag_output_text, diag_output_images]
             )
 
-        # TAB 2: Elaborazione
+        # TAB 3: Elaborazione
         with gr.Tab("⚙️ Elaborazione Batch"):
             gr.Markdown("Elabora un batch di immagini con il modello.")
             with gr.Row():
                 proc_input = gr.File(file_count="multiple", label="Carica immagini da elaborare", type="filepath")
             with gr.Row():
-                proc_model = gr.Textbox(label="Percorso del modello", value="./models/pix2pix_turbo_canny.pth")
+                # proc_model = gr.Textbox(label="Percorso del modello", value="./models/pix2pix_turbo_canny.pth")
+                proc_model_dropdown = gr.Dropdown(
+                    label="Seleziona modello",
+                    choices=get_model_dropdown(),
+                    value="6h-MC Model - High-quality model for Protohistoric and Historic drawings (38.3MB)"
+                )
                 proc_prompt = gr.Textbox(label="Prompt", value="make it ready for publication")
+                proc_model_path_hidden = gr.Textbox(visible=False)
+                proc_model_dropdown.change(
+                    fn=on_model_select,
+                    inputs=proc_model_dropdown,
+                    outputs=proc_model_path_hidden
+                )
+
             with gr.Row():
                 proc_output_dir = gr.Textbox(label="Cartella di output", value="./output")
                 proc_use_fp16 = gr.Checkbox(label="Usa FP16 (più veloce, meno memoria)")
@@ -176,7 +304,7 @@ with gr.Blocks(title="🖼️ Pix2Pix_Turbo Image Enhancer") as demo:
             proc_button.click(
                 fn=run_gradio_processing,
                 inputs=[
-                    proc_input, proc_model, proc_prompt, proc_output_dir, proc_use_fp16,
+                    proc_input, proc_model_path_hidden, proc_prompt, proc_output_dir, proc_use_fp16,
                     proc_contrast, proc_patch_size, proc_overlap, proc_upscale
                 ],
                 outputs=[proc_output_text, proc_output_zip, proc_output_comparisons]
