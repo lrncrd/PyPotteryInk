@@ -1,3 +1,4 @@
+
 --extra-index-url https://download.pytorch.org/whl/cu118
 huggingface-hub==0.25.0
 torch>=2.0.1
@@ -13,3 +14,6 @@ peft==0.13.2
 matplotlib==3.10.0
 scikit-image==0.25.0
 seaborn==0.13.2
+tqdm==4.67.1
+pillow==11.3.0
+gradio>=5.43.1
