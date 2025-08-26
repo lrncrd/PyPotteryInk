@@ -34,6 +34,9 @@ As part of the **PyPottery** toolkit, `PyPotteryInk` is a deep learning applicat
 - 🖼️ **High-Resolution Processing**: Advanced patch-based system for handling large drawings
 - 🎨 **Stippling Control**: Fine-grained control over dot patterns and shading
 - 📂 **Batch Processing**: Efficient handling of multiple drawings
+- 🖥️ **Gradio Interface**: User-friendly web interface with real-time progress tracking
+- 🍎 **Apple Silicon Support**: Optimized for Mac M-series chips with Metal Performance Shaders (MPS)
+- 📊 **Live Console Output**: See detailed processing status including model downloads and patch progress
 
 ## 📚 Documentation
 
@@ -56,15 +59,114 @@ As part of the **PyPottery** toolkit, `PyPotteryInk` is a deep learning applicat
 
 All models support custom fine-tuning for specific archaeological contexts or styles.
 
-## ⚡ Benchmarks
+## 🚀 Quick Start
 
+### Installation
+
+#### Automatic Installation
+
+**Windows:**
+```bash
+git clone https://github.com/lrncrd/PyPotteryInk
+cd PyPotteryInk
+install.bat
+```
+
+**macOS/Linux:**
+```bash
+git clone https://github.com/lrncrd/PyPotteryInk
+cd PyPotteryInk
+chmod +x install.sh
+./install.sh
+```
+
+#### Manual Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/lrncrd/PyPotteryInk
+cd PyPotteryInk
+```
+
+2. Create a virtual environment:
+```bash
+python -m venv venv
+# Windows
+venv\Scripts\activate
+# macOS/Linux
+source venv/bin/activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+### Running the Gradio Interface
+
+**Windows:**
+```bash
+run_app.bat
+```
+
+**macOS/Linux:**
+```bash
+./run_app.sh
+```
+
+Or manually:
+```bash
+python app.py
+```
+
+Then open your browser at `http://localhost:7860`
+
+### First Run
+
+On first use, PyPotteryInk will automatically download required models:
+- **PyPotteryInk models** (~38MB each): Downloaded to `models/` folder
+- **Diffusion model** (~3.46GB): Downloaded to Hugging Face cache
+
+⚠️ **Note**: The first model download may take time depending on your internet connection. Once downloaded, models are cached and load instantly.
+
+### Pre-downloading Models
+
+To download all models in advance:
+```bash
+python download_models.py
+```
+
+### Using the Interface
+
+1. **Upload Drawing**: Drag and drop or click to upload your pencil drawing
+2. **Select Model**: Choose the appropriate model for your pottery type
+3. **Monitor Progress**: Watch real-time updates in the Processing Status panel
+4. **Download Result**: Save your publication-ready drawing
+
+#### Processing Status
+
+The interface shows detailed progress including:
+- Model initialization and device detection (CUDA/MPS/CPU)
+- Download progress for models (with speed and ETA)
+- Patch processing progress with percentage
+- Memory usage and cleanup status
+
+#### GPU Acceleration
+
+- **NVIDIA GPUs**: Full CUDA support with FP16 mode for faster processing
+- **Apple Silicon**: Metal Performance Shaders (MPS) support for M1/M2/M3/M4 Macs
+- **CPU Mode**: Fallback for systems without GPU acceleration
+
+## ⚡ Benchmarks
 
 | GPU                 | Processing time for `test_image.jpg` (s) |
 | ------------------- | -------------------------------- |
 | 3070Ti (Windows 11) | 51.48                            |
-| T4 (Google Colab)   | 57.56                             |
+| T4 (Google Colab)   | 57.56                            |
+| M1 Pro (macOS)      | ~70-90                          |
+| M2/M3/M4 (macOS)    | ~60-80                          |
 
-The benchmarks were performed using the `process_single_image` function. 
+The benchmarks were performed using the `process_single_image` function with default settings (512px patches). 
 
 
 ## 📢 AI Disclosure and Citation
@@ -118,20 +220,18 @@ or
 ```
 
 
-## 👥 Contributors
 
+## 👥 Contributors
 
 <a href="https://github.com/lrncrd/PyPotteryInk/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=lrncrd/PyPotteryInk" />
 </a>
 
-
-
 Developed with ❤️ by [Lorenzo Cardarelli](https://github.com/lrncrd)
-</div>
 
 Based on img2img-turbo by [GaParmar](https://github.com/GaParmar/img2img-turbo)
 
 The original code was released under the MIT Licence. The changes made in this fork are released under the Apache License 2.0.
 
 ---
+
