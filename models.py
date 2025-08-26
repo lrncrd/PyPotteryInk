@@ -10,8 +10,13 @@ from diffusers import AutoencoderKL, UNet2DConditionModel
 from diffusers.utils.peft_utils import set_weights_and_activate_adapters
 from peft import LoraConfig
 
-# Usa automaticamente la GPU se disponibile, altrimenti la CPU
-device = "cuda" if torch.cuda.is_available() else "cpu"
+# Automatically use GPU if available, otherwise CPU
+if torch.backends.mps.is_available():
+    device = torch.device("mps")
+elif torch.cuda.is_available():
+    device = torch.device("cuda")
+else:
+    device = torch.device("cpu")
 
 ### Models readapted from the original codebase: https://github.com/GaParmar/img2img-turbo
 

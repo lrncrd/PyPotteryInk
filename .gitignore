@@ -185,3 +185,6 @@ venv*
 *.pkl
 temp_*
 output
+BK 
+docs
+
