@@ -13,10 +13,18 @@ from peft import LoraConfig
 ### Models readapted from the original codebase: https://github.com/GaParmar/img2img-turbo 
 
 
-def make_1step_sched():
+def make_1step_sched(device="cuda"):
+    # Auto-detect best available device if cuda is specified but not available
+    if device == "cuda" and not torch.cuda.is_available():
+        if torch.backends.mps.is_available():
+            device = "mps"
+        else:
+            device = "cpu"
+    
     noise_scheduler_1step = DDPMScheduler.from_pretrained("stabilityai/sd-turbo", subfolder="scheduler")
-    noise_scheduler_1step.set_timesteps(1, device="cuda")
-    noise_scheduler_1step.alphas_cumprod = noise_scheduler_1step.alphas_cumprod.cuda()
+    noise_scheduler_1step.set_timesteps(1, device=device)
+    noise_scheduler_1step.alphas_cumprod = noise_scheduler_1step.alphas_cumprod.to(device)
+    
     return noise_scheduler_1step
 
 
@@ -77,19 +85,33 @@ class TwinConv(torch.nn.Module):
         return x1 * (1 - self.r) + x2 * (self.r)
 
 class Pix2Pix_Turbo(torch.nn.Module):
-    def __init__(self, pretrained_path=None):
+    def __init__(self, pretrained_path=None, device=None):
         super().__init__()
+        
+        # Determine device - support CUDA, MPS, or CPU
+        if device is None:
+            if torch.cuda.is_available():
+                self.device = torch.device("cuda")
+            elif torch.backends.mps.is_available():
+                self.device = torch.device("mps")
+            else:
+                self.device = torch.device("cpu")
+        else:
+            self.device = torch.device(device)
+        
+        print(f"Initializing Pix2Pix_Turbo on device: {self.device}")
+        
         self.tokenizer = AutoTokenizer.from_pretrained("stabilityai/sd-turbo", subfolder="tokenizer")
-        self.text_encoder = CLIPTextModel.from_pretrained("stabilityai/sd-turbo", subfolder="text_encoder").cuda()
-        self.sched = make_1step_sched()
+        self.text_encoder = CLIPTextModel.from_pretrained("stabilityai/sd-turbo", subfolder="text_encoder").to(self.device)
+        self.sched = make_1step_sched(device=str(self.device))
 
         vae = AutoencoderKL.from_pretrained("stabilityai/sd-turbo", subfolder="vae")
         vae.encoder.forward = my_vae_encoder_fwd.__get__(vae.encoder, vae.encoder.__class__)
         vae.decoder.forward = my_vae_decoder_fwd.__get__(vae.decoder, vae.decoder.__class__)
-        vae.decoder.skip_conv_1 = torch.nn.Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), bias=False).cuda()
-        vae.decoder.skip_conv_2 = torch.nn.Conv2d(256, 512, kernel_size=(1, 1), stride=(1, 1), bias=False).cuda()
-        vae.decoder.skip_conv_3 = torch.nn.Conv2d(128, 512, kernel_size=(1, 1), stride=(1, 1), bias=False).cuda()
-        vae.decoder.skip_conv_4 = torch.nn.Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False).cuda()
+        vae.decoder.skip_conv_1 = torch.nn.Conv2d(512, 512, kernel_size=(1, 1), stride=(1, 1), bias=False).to(self.device)
+        vae.decoder.skip_conv_2 = torch.nn.Conv2d(256, 512, kernel_size=(1, 1), stride=(1, 1), bias=False).to(self.device)
+        vae.decoder.skip_conv_3 = torch.nn.Conv2d(128, 512, kernel_size=(1, 1), stride=(1, 1), bias=False).to(self.device)
+        vae.decoder.skip_conv_4 = torch.nn.Conv2d(128, 256, kernel_size=(1, 1), stride=(1, 1), bias=False).to(self.device)
         vae.decoder.ignore_skip = False
         unet = UNet2DConditionModel.from_pretrained("stabilityai/sd-turbo", subfolder="unet")
 
@@ -124,11 +146,11 @@ class Pix2Pix_Turbo(torch.nn.Module):
                 _sd_unet[k] = sd["state_dict_unet"][k]
             unet.load_state_dict(_sd_unet)
 
-        unet.to("cuda")
-        vae.to("cuda")
+        unet.to(self.device)
+        vae.to(self.device)
         self.unet, self.vae = unet, vae
         self.vae.decoder.gamma = 1
-        self.timesteps = torch.tensor([999], device="cuda").long()
+        self.timesteps = torch.tensor([999], device=self.device).long()
         self.text_encoder.requires_grad_(False)
 
     def set_eval(self):
@@ -159,7 +181,7 @@ class Pix2Pix_Turbo(torch.nn.Module):
         if prompt is not None:
             # encode the text prompt
             caption_tokens = self.tokenizer(prompt, max_length=self.tokenizer.model_max_length,
-                                            padding="max_length", truncation=True, return_tensors="pt").input_ids.cuda()
+                                            padding="max_length", truncation=True, return_tensors="pt").input_ids.to(self.device)
             caption_enc = self.text_encoder(caption_tokens)[0]
         else:
             caption_enc = self.text_encoder(prompt_tokens)[0]
