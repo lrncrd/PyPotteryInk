@@ -180,3 +180,10 @@ cython_debug/
 *.psd
 
 PyPotteryInk_0.0.3
+/.claude/
+/test_input/test_img.jpg
+/CLAUDE.md
+/=4.0.0
+.DS_Store
+.gradio/
+*.safetensors
