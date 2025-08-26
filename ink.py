@@ -7,7 +7,6 @@ import gc
 from tqdm import tqdm
 from models import Pix2Pix_Turbo
 import matplotlib.pyplot as plt
-from PIL import Image
 import random
 import time
 import datetime
@@ -67,9 +66,18 @@ def run_diagnostics(
     
     # Initialize model for diagnostics
     print("🔄 Loading model for diagnostics...")
-    model = Pix2Pix_Turbo(pretrained_path=model_path)
+    # Check device availability - support CUDA, MPS, or CPU
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    model = Pix2Pix_Turbo(pretrained_path=model_path, device=device)
     model.set_eval()
-    model.half()  # Using FP16 for diagnostics
+    # Note: FP16 (half precision) is not well supported on MPS yet
+    if torch.cuda.is_available():
+        model.half()  # Using FP16 for diagnostics only on CUDA GPU
     
     for idx, img_file in enumerate(sample_images):
         print(f"\n🖼️ Analyzing sample image {idx+1}/{num_samples}: {img_file}")
@@ -318,17 +326,17 @@ def create_blend_mask(patch_width, patch_height, row, col, overlap):
 
 
 def process_single_image(
-    input_image_path_or_pil,
-    model_path,
-    prompt = "make it ready for publication",
-    output_dir='output',
-    use_fp16=False,
-    output_name=None,
-    contrast_scale=1,
-    return_pil=False,
-    patch_size=512,
-    overlap=64,
-    upscale=1, 
+        input_image_path_or_pil,
+        model_path,
+        prompt = "make it ready for publication",
+        output_dir='output',
+        use_fp16=False,
+        output_name=None,
+        contrast_scale=1,
+        return_pil=False,
+        patch_size=512,
+        overlap=64,
+        upscale=1,
 ):
     """
     Process a single image with modified pix2pix_turbo using improved patch strategy.
@@ -348,17 +356,30 @@ def process_single_image(
         os.makedirs(output_dir, exist_ok=True)
         print(f"📁 Output directory created: {output_dir}")
 
-    # Initialize model (unchanged)
-    model = Pix2Pix_Turbo(pretrained_path=model_path)
+    # Check device availability - support CUDA, MPS, or CPU
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    print(f"🔧 Using device: {device}")
+
+    # Initialize model with proper device handling
+    model = Pix2Pix_Turbo(pretrained_path=model_path, device=device)
     model.set_eval()
-    if use_fp16:
+    # Only use FP16 if CUDA is available
+    if use_fp16 and torch.cuda.is_available():
         model.half()
+    elif use_fp16:
+        print("⚠️ FP16 requested but CUDA not available, using FP32 instead")
 
     # Process input image
     if isinstance(input_image_path_or_pil, str):
         input_image = Image.open(input_image_path_or_pil).convert('RGB')
     else:
         input_image = input_image_path_or_pil.convert('RGB')
+
 
     # Upscale image
 
@@ -382,23 +403,23 @@ def process_single_image(
 
     # Initialize output
     output_image = Image.new('RGB', (width, height))
-    
+
     # Calculate patches
     total_patches, patches_per_row, num_rows = calculate_patches(width, height, patch_size, overlap)
-    
+
     try:
         with torch.no_grad():
             for idx in tqdm(range(total_patches), desc=f"Processing image"):
                 # Get patch coordinates
                 x_start, y_start, x_end, y_end, row, col = get_patch_coordinates(
                     idx, patches_per_row, num_rows, width, height, patch_size, overlap)
-                
+
                 # Extract and process patch
                 patch = input_image.crop((x_start, y_start, x_end, y_end))
                 patch = ImageEnhance.Contrast(patch).enhance(contrast_scale)
-                
-                c_t = F.to_tensor(patch).unsqueeze(0).cuda()
-                if use_fp16:
+
+                c_t = F.to_tensor(patch).unsqueeze(0).to(device)
+                if use_fp16 and torch.cuda.is_available():
                     c_t = c_t.half()
 
                 # Run model
@@ -410,7 +431,8 @@ def process_single_image(
                 output_image.paste(patch_pil, (x_start, y_start), mask)
 
                 del c_t, output_patch
-                torch.cuda.empty_cache()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
 
     except Exception as e:
         print(f"\n❌ Error during processing: {str(e)}")
@@ -418,7 +440,8 @@ def process_single_image(
     finally:
         print("\n🧹 Cleaning up resources...")
         gc.collect()
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     if return_pil:
         print(f"\n✅ Processing complete! Returning PIL image \n ---------------------------------")
@@ -486,11 +509,21 @@ def process_folder(
 
     # Initialize model
     print("\n🔄 Loading model...")
-    model = Pix2Pix_Turbo(pretrained_path=model_path)
+    # Check device availability - support CUDA, MPS, or CPU
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+    model = Pix2Pix_Turbo(pretrained_path=model_path, device=device)
     model.set_eval()
-    if use_fp16:
+    # Note: FP16 is only supported on CUDA, not on MPS yet
+    if use_fp16 and torch.cuda.is_available():
         print("🚀 Converting model to FP16")
         model.half()
+    elif use_fp16:
+        print("⚠️ FP16 requested but not supported on this device, using FP32 instead")
     print("✅ Model loaded successfully")
 
     # Process statistics
@@ -574,8 +607,8 @@ def process_folder(
                         patch = input_image.crop((x_start, y_start, x_end, y_end))
                         patch = ImageEnhance.Contrast(patch).enhance(contrast_scale)
                         
-                        c_t = F.to_tensor(patch).unsqueeze(0).cuda()
-                        if use_fp16:
+                        c_t = F.to_tensor(patch).unsqueeze(0).to(device)
+                        if use_fp16 and torch.cuda.is_available():
                             c_t = c_t.half()
 
                         # Run model
