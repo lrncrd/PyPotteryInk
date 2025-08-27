@@ -180,3 +180,14 @@ cython_debug/
 *.psd
 
 PyPotteryInk_0.0.3
+
+venv*
+*.pkl
+temp_*
+output
+BK 
+docs
+
+/custom_stats.npy
+/test_progress_direct.py
+/test_progress.py
