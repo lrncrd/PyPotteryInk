@@ -22,7 +22,7 @@ MODELS = {
     },
     "6h-MCG Model": {
         "description": "High-quality model for Bronze Age drawings",
-        "size": "38.3MB", 
+        "size": "38.3MB",
         "url": "https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MCG.pkl?download=true",
         "filename": "6h-MCG.pkl",
         "prompt": "enhance Bronze Age pottery drawing for archaeological publication"
@@ -30,7 +30,7 @@ MODELS = {
     "6h-MC Model": {
         "description": "High-quality model for Protohistoric and Historic drawings",
         "size": "38.3MB",
-        "url": "https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MC.pkl?download=true", 
+        "url": "https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MC.pkl?download=true",
         "filename": "6h-MC.pkl",
         "prompt": "enhance protohistoric pottery drawing for publication"
     },
@@ -38,7 +38,7 @@ MODELS = {
         "description": "Tailored model for Historic and painted pottery",
         "size": "38.3MB",
         "url": "https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/4h-PAINT.pkl?download=true",
-        "filename": "4h-PAINT.pkl", 
+        "filename": "4h-PAINT.pkl",
         "prompt": "enhance painted pottery drawing for archaeological publication"
     }
 }
@@ -80,7 +80,7 @@ def get_model_dropdown():
 
 # Temporary directories
 TEMP_INPUT = "temp_input"
-TEMP_OUTPUT = "temp_output" 
+TEMP_OUTPUT = "temp_output"
 TEMP_DIAGNOSTICS = "temp_diagnostics"
 
 os.makedirs(TEMP_INPUT, exist_ok=True)
@@ -100,14 +100,14 @@ def load_model_stats(model_name):
     """Load pre-computed model statistics"""
     stats_files = {
         "10k Model": "models/model_10k_stats.npy",
-        "6h-MCG Model": "models/6h_MCG_stats.npy", 
+        "6h-MCG Model": "models/6h_MCG_stats.npy",
         "6h-MC Model": "models/6h_MC_stats.npy",
         "4h-PAINT Model": "models/4h_PAINT_stats.npy"
     }
-    
+
     model_key = model_name.split(" (")[0]  # Extract model name
     stats_file = stats_files.get(model_key)
-    
+
     if stats_file and os.path.exists(stats_file):
         try:
             stats = np.load(stats_file, allow_pickle=True).item()
@@ -121,23 +121,23 @@ def run_calculate_statistics_with_viz(input_images, save_path, generate_viz=True
     """Calculate statistics from images and optionally generate visualization plots"""
     if not input_images:
         return "❌ Please upload images for statistics calculation", None
-    
+
     if not save_path:
         save_path = "./custom_stats.npy"
-    
+
     try:
         # Save images to temp folder
         clear_temp_dirs()
         for img in input_images:
             shutil.copy(img.name, TEMP_INPUT)
-        
+
         from preprocessing import DatasetAnalyzer
         analyzer = DatasetAnalyzer()
         distributions = analyzer.analyze_dataset(TEMP_INPUT)
-        
+
         # Save statistics
         analyzer.save_analysis(save_path)
-        
+
         # Create detailed statistics report
         summary = f"""## ✅ Statistics Calculation Completed!
 
@@ -148,19 +148,19 @@ def run_calculate_statistics_with_viz(input_images, save_path, generate_viz=True
 
 | Metric | Mean | Std Dev | Min | Max | Median |
 |--------|------|---------|-----|-----|--------|"""
-        
+
         # First add table rows
         for metric_name, stats in distributions.items():
             display_name = metric_name.replace('_', ' ').title()
             summary += f"\n| {display_name} | {stats['mean']:.4f} | {stats['std']:.4f} | {stats['min']:.4f} | {stats['max']:.4f} | {stats['percentiles'][2]:.4f} |"
-        
+
         summary += "\n\n### 📈 Detailed Analysis:\n"
-        
+
         # Add detailed statistics for each metric
         for metric_name, stats in distributions.items():
             # Format metric name for display
             display_name = metric_name.replace('_', ' ').title()
-            
+
             summary += f"\n#### {display_name}:\n"
             summary += f"- **Mean**: {stats['mean']:.4f}\n"
             summary += f"- **Std Dev**: {stats['std']:.4f}\n"
@@ -169,10 +169,10 @@ def run_calculate_statistics_with_viz(input_images, save_path, generate_viz=True
             summary += f"- **Percentiles** (5%, 25%, 50%, 75%, 95%):\n"
             summary += f"  - {', '.join([f'{p:.4f}' for p in stats['percentiles']])}\n"
             summary += f"- **Samples**: {stats['n_samples']}\n"
-        
+
         summary += f"\n### 💾 File saved as: `{save_path}`\n"
         summary += "\nThe statistics file is ready to use in the preprocessing section below."
-        
+
         # Generate visualizations if requested
         visualization_paths = []
         if generate_viz:
@@ -180,37 +180,37 @@ def run_calculate_statistics_with_viz(input_images, save_path, generate_viz=True
                 # Create visualization directory
                 viz_dir = os.path.join(TEMP_DIAGNOSTICS, "statistics_viz")
                 os.makedirs(viz_dir, exist_ok=True)
-                
+
                 # Create individual plots for each metric
                 import matplotlib.pyplot as plt
                 import matplotlib.patches as mpatches
-                
+
                 for metric_name, stats in distributions.items():
                     fig, ax = plt.subplots(figsize=(10, 6))
-                    
+
                     # Get values
                     values = stats['values']
-                    
+
                     # Create histogram with KDE
-                    counts, bins, patches = ax.hist(values, bins=30, density=True, 
-                                                   alpha=0.7, color='skyblue', 
+                    counts, bins, patches = ax.hist(values, bins=30, density=True,
+                                                   alpha=0.7, color='skyblue',
                                                    edgecolor='black', linewidth=1.2)
-                    
+
                     # Add KDE curve if we have enough samples
                     if len(values) > 5:
                         from scipy import stats as scipy_stats
                         kde = scipy_stats.gaussian_kde(values)
                         x_range = np.linspace(min(values), max(values), 100)
                         ax.plot(x_range, kde(x_range), 'r-', linewidth=2, label='KDE')
-                    
+
                     # Add statistical markers
                     ax.axvline(stats['mean'], color='green', linestyle='--', linewidth=2, label=f'Mean: {stats["mean"]:.4f}')
                     ax.axvline(stats['percentiles'][2], color='orange', linestyle='--', linewidth=2, label=f'Median: {stats["percentiles"][2]:.4f}')
-                    
+
                     # Add shaded regions for percentiles
-                    ax.axvspan(stats['percentiles'][1], stats['percentiles'][3], 
+                    ax.axvspan(stats['percentiles'][1], stats['percentiles'][3],
                               alpha=0.2, color='gray', label='25th-75th percentile')
-                    
+
                     # Labels and title
                     display_name = metric_name.replace('_', ' ').title()
                     ax.set_title(f'Distribution of {display_name}', fontsize=16, fontweight='bold')
@@ -218,53 +218,53 @@ def run_calculate_statistics_with_viz(input_images, save_path, generate_viz=True
                     ax.set_ylabel('Density', fontsize=12)
                     ax.legend()
                     ax.grid(True, alpha=0.3)
-                    
+
                     # Save plot
                     plot_path = os.path.join(viz_dir, f'{metric_name}_distribution.png')
                     plt.tight_layout()
                     plt.savefig(plot_path, dpi=150, bbox_inches='tight')
                     plt.close()
-                    
+
                     visualization_paths.append(plot_path)
-                
+
                 # Create a combined overview plot
                 n_metrics = len(distributions)
                 fig, axes = plt.subplots(n_metrics, 1, figsize=(12, 4*n_metrics))
                 if n_metrics == 1:
                     axes = [axes]
-                
+
                 for idx, (metric_name, stats) in enumerate(distributions.items()):
                     ax = axes[idx]
                     values = stats['values']
-                    
+
                     # Box plot
                     bp = ax.boxplot([values], vert=False, patch_artist=True, widths=0.6)
                     bp['boxes'][0].set_facecolor('lightblue')
                     bp['boxes'][0].set_alpha(0.7)
-                    
+
                     # Add mean marker
                     ax.scatter([stats['mean']], [1], color='red', s=100, zorder=5, label='Mean')
-                    
+
                     # Labels
                     display_name = metric_name.replace('_', ' ').title()
                     ax.set_title(display_name, fontsize=14, fontweight='bold')
                     ax.set_xlabel('Value', fontsize=12)
                     ax.set_yticks([])
                     ax.grid(True, axis='x', alpha=0.3)
-                    
+
                 plt.tight_layout()
                 overview_path = os.path.join(viz_dir, 'all_metrics_overview.png')
                 plt.savefig(overview_path, dpi=150, bbox_inches='tight')
                 plt.close()
-                
+
                 visualization_paths.insert(0, overview_path)
-                
+
             except Exception as e:
                 print(f"Warning: Could not generate visualizations: {e}")
                 summary += f"\n⚠️ Visualization generation failed: {str(e)}"
-        
+
         return summary, visualization_paths if visualization_paths else None
-        
+
     except Exception as e:
         return f"❌ Statistics calculation failed: {str(e)}", None
 
@@ -272,23 +272,23 @@ def run_calculate_statistics(input_images, save_path):
     """Calculate statistics from images and save to .npy file"""
     if not input_images:
         return "❌ Please upload images for statistics calculation"
-    
+
     if not save_path:
         save_path = "./custom_stats.npy"
-    
+
     try:
         # Save images to temp folder
         clear_temp_dirs()
         for img in input_images:
             shutil.copy(img.name, TEMP_INPUT)
-        
+
         from preprocessing import DatasetAnalyzer
         analyzer = DatasetAnalyzer()
         distributions = analyzer.analyze_dataset(TEMP_INPUT)
-        
+
         # Save statistics
         analyzer.save_analysis(save_path)
-        
+
         # Create detailed statistics report
         summary = f"""## ✅ Statistics Calculation Completed!
 
@@ -297,12 +297,12 @@ def run_calculate_statistics(input_images, save_path):
 
 ### 📊 Detailed Statistics Report:
 """
-        
+
         # Add detailed statistics for each metric
         for metric_name, stats in distributions.items():
             # Format metric name for display
             display_name = metric_name.replace('_', ' ').title()
-            
+
             summary += f"\n#### {display_name}:\n"
             summary += f"- **Mean**: {stats['mean']:.4f}\n"
             summary += f"- **Std Dev**: {stats['std']:.4f}\n"
@@ -311,12 +311,12 @@ def run_calculate_statistics(input_images, save_path):
             summary += f"- **Percentiles** (5%, 25%, 50%, 75%, 95%):\n"
             summary += f"  - {', '.join([f'{p:.4f}' for p in stats['percentiles']])}\n"
             summary += f"- **Samples**: {stats['n_samples']}\n"
-        
+
         summary += f"\n### 💾 File saved as: `{save_path}`\n"
         summary += "\nThe statistics file is ready to use in the preprocessing section below."
-        
+
         return summary
-        
+
     except Exception as e:
         return f"❌ Statistics calculation failed: {str(e)}"
 
@@ -324,31 +324,31 @@ def run_preprocessing_adjustment(input_images, stats_file, output_dir, calculate
     """Apply preprocessing adjustments to images"""
     if not input_images:
         return "❌ Please upload images for preprocessing", None
-    
+
     if not output_dir:
         output_dir = "./preprocessed_images"
-    
+
     # Prepare directories
     clear_temp_dirs()
     os.makedirs(output_dir, exist_ok=True)
-    
+
     try:
         from preprocessing import DatasetAnalyzer, apply_recommended_adjustments, check_image_quality
-        
+
         # Determine which statistics to use
         model_stats = None
-        
+
         if calculate_stats:
             # Calculate statistics from uploaded images
             print("📊 Calculating statistics from uploaded images...")
             # Save images to temp folder first
             for img in input_images:
                 shutil.copy(img.name, TEMP_INPUT)
-            
+
             analyzer = DatasetAnalyzer()
             model_stats = analyzer.analyze_dataset(TEMP_INPUT)
             print("✅ Statistics calculated successfully")
-            
+
         elif use_uploaded_stats and stats_file:
             # Load statistics from uploaded .npy file
             print("📁 Loading statistics from uploaded file...")
@@ -357,19 +357,19 @@ def run_preprocessing_adjustment(input_images, stats_file, output_dir, calculate
             print("✅ Statistics loaded successfully")
         else:
             return "❌ Please upload a statistics file (.npy). You can generate one using the 'Calculate Statistics' section above.", None
-        
+
         # Process each image
         processed_images = []
         results_summary = []
-        
+
         for idx, img in enumerate(input_images):
             # Load image
             image = Image.open(img.name).convert('RGB')
             original_name = os.path.basename(img.name)
-            
+
             # Check if adjustments are needed
             quality_check = check_image_quality(image, model_stats)
-            
+
             if quality_check['recommendations']:
                 # Apply adjustments
                 adjusted_image = apply_recommended_adjustments(image, model_stats, verbose=False)
@@ -378,16 +378,16 @@ def run_preprocessing_adjustment(input_images, stats_file, output_dir, calculate
                 # No adjustments needed
                 adjusted_image = image
                 results_summary.append(f"ℹ️ {original_name}: No adjustments needed")
-            
+
             # Save processed image
             output_path = os.path.join(output_dir, original_name)
             adjusted_image.save(output_path)
             processed_images.append(output_path)
-        
+
         # Limit to maximum 20 images for gallery display
         display_images = processed_images[:20]
         total_processed = len(processed_images)
-        
+
         if total_processed > 20:
             summary = f"""## ✅ Preprocessing Completed!
 
@@ -407,9 +407,9 @@ def run_preprocessing_adjustment(input_images, stats_file, output_dir, calculate
 ### Processing Results:
 {chr(10).join(results_summary)}
 """
-        
+
         return summary, display_images
-        
+
     except Exception as e:
         return f"❌ Preprocessing failed: {str(e)}", None
 
@@ -463,19 +463,19 @@ def run_gradio_diagnostics(input_images, model_path, prompt, patch_size, overlap
     # Limit to maximum 20 images for gallery display
     display_images = diagnostic_images[:20]
     total_images = len(diagnostic_images)
-    
+
     if total_images > 20:
         result_text = f"✅ Diagnostics completed successfully!\n📊 Generated {total_images} visualization(s) (showing first 20)"
     else:
         result_text = f"✅ Diagnostics completed successfully!\n📊 Generated {total_images} visualization(s)"
-    
+
     return result_text, display_images
 
 def open_folder(path):
     """Open a folder in the system's file explorer"""
     import platform
     import subprocess
-    
+
     if platform.system() == 'Darwin':  # macOS
         subprocess.Popen(['open', path])
     elif platform.system() == 'Windows':  # Windows
@@ -513,7 +513,7 @@ def run_gradio_processing(input_images, model_path, prompt, output_dir, use_fp16
         # Create a progress callback
         def update_progress(prog_value, status_text):
             progress(prog_value, desc=status_text)
-        
+
         results = process_folder(
             input_folder=TEMP_INPUT,
             model_path=model_path,
@@ -539,7 +539,7 @@ def run_gradio_processing(input_images, model_path, prompt, output_dir, use_fp16
         # Limit to maximum 20 images for gallery display
         display_images = comparison_images[:20]
         total_comparisons = len(comparison_images)
-        
+
         if total_comparisons > 20:
             gallery_note = f"• 🖼️ Gallery: Showing first 20 of {total_comparisons} comparison images"
         else:
@@ -555,10 +555,10 @@ def run_gradio_processing(input_images, model_path, prompt, output_dir, use_fp16
             f"• 📝 Log file: `{results.get('log_file', 'N/A')}`\n"
             f"{gallery_note}"
         )
-        
+
         # Show open folder button
         open_folder_button = gr.update(visible=True)
-        
+
         return summary, display_images, popup_message, open_folder_button, output_dir
     except Exception as e:
         return f"❌ **Processing Error:**\n```\n{str(e)}\n```", None, popup_message, gr.update(visible=False), ""
@@ -575,7 +575,7 @@ def run_hardware_check():
 def on_model_select(selection):
     if not selection:
         return "", ""
-    
+
     # Extract model name from selection
     model_name = selection.split(" (")[0]
     if model_name in MODELS:
@@ -594,12 +594,12 @@ with gr.Blocks(
         margin: 10px 0 !important;
         animation: fadeIn 0.5s ease-in-out !important;
     }
-    
+
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(-10px); }
         to { opacity: 1; transform: translateY(0); }
     }
-    
+
     #attribution-popup p {
         color: #92400e !important;
         font-weight: 500 !important;
@@ -607,18 +607,18 @@ with gr.Blocks(
     }
     """
 ) as demo:
-    
+
     # Convert logo image to base64 to embed it directly in HTML
     image_path = os.path.join(os.path.dirname(__file__), "imgs", "pypotteryink.png")
     with open(image_path, "rb") as img_file:
         import base64
         img_data = base64.b64encode(img_file.read()).decode()
-    
+
     gr.HTML(f"""
     <div style="display: flex; align-items: center; padding: 20px; background: #f9fafb; border-radius: 8px; margin-bottom: 25px; border: 1px solid #e5e7eb;">
         <div style="margin-right: 20px;">
-            <img src="data:image/png;base64,{img_data}" 
-                alt="PyPotteryInk Logo" 
+            <img src="data:image/png;base64,{img_data}"
+                alt="PyPotteryInk Logo"
                 style="border-radius: 8px; width: 64px; height: 64px; object-fit: contain;"/>
         </div>
         <div>
@@ -643,10 +643,10 @@ with gr.Blocks(
                 </p>
             </div>
             """)
-            
+
             with gr.Row():
                 hw_btn = gr.Button("Analyze Hardware", variant="primary", scale=1, size="lg")
-            
+
             hw_report = gr.Markdown(label="Hardware Analysis Report")
             hw_btn.click(fn=run_hardware_check, outputs=hw_report)
 
@@ -672,21 +672,22 @@ with gr.Blocks(
                 </p>
             </div>
             """)
-            
+
             with gr.Row():
                 with gr.Column(scale=2):
                     diag_input = gr.File(
-                        file_count="multiple", 
-                        label="Upload Images for Diagnostics", 
+                        file_count="multiple",
+                        label="Upload Images for Diagnostics",
                         type="filepath",
                         file_types=["image"]
                     )
-                
+
                 with gr.Column(scale=1):
                     model_dropdown_diag = gr.Dropdown(
                         label="Select AI Model",
                         choices=get_model_dropdown(),
-                        info="Each model is specialized for different pottery types"
+                        info="Each model is specialized for different pottery types",
+                        value=""
                     )
 
             # Hidden components to handle the model
@@ -696,14 +697,14 @@ with gr.Blocks(
             with gr.Row():
                 with gr.Column():
                     diag_patch_size = gr.Slider(
-                        minimum=256, maximum=1024, value=512, step=64, 
-                        label="Patch Size", 
+                        minimum=256, maximum=1024, value=512, step=64,
+                        label="Patch Size",
                         info="Size of processing patches"
                     )
                 with gr.Column():
                     diag_overlap = gr.Slider(
-                        minimum=0, maximum=128, value=64, step=8, 
-                        label="Patch Overlap", 
+                        minimum=0, maximum=128, value=64, step=8,
+                        label="Patch Overlap",
                         info="Overlap between patches"
                     )
 
@@ -712,13 +713,13 @@ with gr.Blocks(
                 value="0.75, 1.0, 1.5, 2.0",
                 info="Comma-separated values for contrast comparison"
             )
-            
+
             with gr.Row():
                 diag_button = gr.Button("Run Diagnostics", variant="primary", size="lg")
-            
+
             diag_output_text = gr.Markdown(label="Diagnostic Results")
             diag_output_images = gr.Gallery(
-                label="Diagnostic Visualizations", 
+                label="Diagnostic Visualizations",
                 show_label=True,
                 elem_id="diag-gallery",
                 columns=3,
@@ -735,7 +736,7 @@ with gr.Blocks(
 
             diag_button.click(
                 fn=run_gradio_diagnostics,
-                inputs=[diag_input, model_path_hidden_diag, model_prompt_hidden_diag, 
+                inputs=[diag_input, model_path_hidden_diag, model_prompt_hidden_diag,
                        diag_patch_size, diag_overlap, diag_contrast],
                 outputs=[diag_output_text, diag_output_images]
             )
@@ -750,7 +751,7 @@ with gr.Blocks(
                 </p>
             </div>
             """)
-            
+
             # SECTION 1: Calculate Statistics (Optional)
             gr.HTML("""
             <div style="background: #f3f4f6; border-left: 4px solid #9ca3af; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -760,16 +761,16 @@ with gr.Blocks(
                 </p>
             </div>
             """)
-            
+
             with gr.Row():
                 with gr.Column(scale=2):
                     stats_calc_input = gr.File(
-                        file_count="multiple", 
-                        label="Upload Training Images for Statistics", 
+                        file_count="multiple",
+                        label="Upload Training Images for Statistics",
                         type="filepath",
                         file_types=["image"]
                     )
-                
+
                 with gr.Column(scale=1):
                     stats_save_path = gr.Textbox(
                         label="Statistics File Path",
@@ -781,10 +782,10 @@ with gr.Blocks(
                         value=True,
                         info="Create graphs showing the statistical distributions"
                     )
-            
+
             with gr.Row():
                 stats_calc_button = gr.Button("Calculate Statistics", variant="secondary", size="lg")
-            
+
             stats_calc_output = gr.Markdown(label="Statistics Calculation Results")
             stats_visualization = gr.Gallery(
                 label="Statistical Distributions",
@@ -793,15 +794,15 @@ with gr.Blocks(
                 height="auto",
                 object_fit="contain"
             )
-            
+
             stats_calc_button.click(
                 fn=lambda imgs, path, viz: run_calculate_statistics_with_viz(imgs, path, viz),
                 inputs=[stats_calc_input, stats_save_path, stats_visualize],
                 outputs=[stats_calc_output, stats_visualization]
             )
-            
+
             gr.HTML("<hr style='margin: 30px 0; border: 1px solid #e5e7eb;'>")
-            
+
             # SECTION 2: Apply Preprocessing (Main)
             gr.HTML("""
             <div style="background: #f3f4f6; border-left: 4px solid #9ca3af; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -811,16 +812,16 @@ with gr.Blocks(
                 </p>
             </div>
             """)
-            
+
             with gr.Row():
                 with gr.Column(scale=2):
                     prep_input = gr.File(
-                        file_count="multiple", 
-                        label="Upload Images to Preprocess", 
+                        file_count="multiple",
+                        label="Upload Images to Preprocess",
                         type="filepath",
                         file_types=["image"]
                     )
-                
+
                 with gr.Column(scale=1):
                     prep_stats_file = gr.File(
                         label="Upload Statistics File (.npy)",
@@ -831,30 +832,30 @@ with gr.Blocks(
             with gr.Row():
                 with gr.Column():
                     prep_output_dir = gr.Textbox(
-                        label="Output Directory", 
+                        label="Output Directory",
                         value="./preprocessed_images"
                         #info="Where to save preprocessed images"
                     )
-            
+
             with gr.Row():
                 prep_button = gr.Button("Apply Preprocessing", variant="primary", size="lg")
-            
+
             prep_output = gr.Markdown(label="Preprocessing Results")
             prep_gallery = gr.Gallery(
-                label="Processed Images", 
+                label="Processed Images",
                 show_label=True,
                 elem_id="prep-gallery",
                 columns=3,
                 height="auto",
                 object_fit="contain"
             )
-            
+
             # Event handlers
             prep_button.click(
                 fn=lambda images, stats_file, output_dir: run_preprocessing_adjustment(
-                    images, 
-                    stats_file, 
-                    output_dir, 
+                    images,
+                    stats_file,
+                    output_dir,
                     False,  # Don't calculate stats in this section
                     True    # Always use uploaded file
                 ),
@@ -872,21 +873,22 @@ with gr.Blocks(
                 </p>
             </div>
             """)
-            
+
             with gr.Row():
                 with gr.Column(scale=2):
                     proc_input = gr.File(
-                        file_count="multiple", 
-                        label="Upload Images to Process", 
+                        file_count="multiple",
+                        label="Upload Images to Process",
                         type="filepath",
                         file_types=["image"]
                     )
-                
+
                 with gr.Column(scale=1):
                     proc_model_dropdown = gr.Dropdown(
                         label="Select AI Model",
                         choices=get_model_dropdown(),
-                        info="Choose the model best suited for your pottery type"
+                        info="Choose the model best suited for your pottery type",
+                        value=""
                     )
 
             # Hidden components
@@ -896,13 +898,13 @@ with gr.Blocks(
             with gr.Row():
                 with gr.Column():
                     proc_output_dir = gr.Textbox(
-                        label="Output Directory", 
+                        label="Output Directory",
                         value="./enhanced_pottery",
                         info="Where to save processed images"
                     )
                 with gr.Column():
                     proc_use_fp16 = gr.Checkbox(
-                        label="Use FP16 Optimization (CUDA only)", 
+                        label="Use FP16 Optimization (CUDA only)",
                         value=True,
                         info="Faster processing with NVIDIA GPUs - ignored on Apple Silicon/CPU"
                     )
@@ -910,70 +912,70 @@ with gr.Blocks(
             with gr.Row():
                 with gr.Column():
                     proc_contrast = gr.Slider(
-                        minimum=0.1, maximum=5.0, value=1.0, step=0.1, 
-                        label="Contrast Scale", 
+                        minimum=0.1, maximum=5.0, value=1.0, step=0.1,
+                        label="Contrast Scale",
                         info="Adjust image contrast"
                     )
                 with gr.Column():
                     proc_upscale = gr.Slider(
-                        minimum=0.5, maximum=2.0, value=1.0, step=0.1, 
-                        label="Upscale Factor", 
+                        minimum=0.5, maximum=2.0, value=1.0, step=0.1,
+                        label="Upscale Factor",
                         info="Resize images"
                     )
 
             with gr.Row():
                 with gr.Column():
                     proc_patch_size = gr.Slider(
-                        minimum=256, maximum=1024, value=512, step=64, 
+                        minimum=256, maximum=1024, value=512, step=64,
                         label="Patch Size"
                     )
                 with gr.Column():
                     proc_overlap = gr.Slider(
-                        minimum=0, maximum=128, value=64, step=8, 
+                        minimum=0, maximum=128, value=64, step=8,
                         label="Patch Overlap"
                     )
-                    
+
             # Advanced export options
             gr.HTML("""
             <div style="background: #ecfdf5; border: 1px solid #10b981; padding: 15px; border-radius: 8px; margin: 15px 0;">
                 <h4 style="color: #065f46; margin-top: 0;">🎨 Advanced Export Options</h4>
             </div>
             """)
-            
+
             with gr.Row():
                 with gr.Column():
                     proc_export_elements = gr.Checkbox(
-                        label="Extract Individual Elements", 
+                        label="Extract Individual Elements",
                         value=True,
                         info="Extract individual pottery elements as separate high-res images"
                     )
                 with gr.Column():
                     proc_export_svg = gr.Checkbox(
-                        label="Export SVG Versions", 
+                        label="Export SVG Versions",
                         value=True,
                         info="Convert outputs to scalable vector graphics (requires potrace)"
                     )
-            
+
             with gr.Row():
                 proc_button = gr.Button("Start Batch Processing", variant="primary", size="lg")
-            
+
             # Attribution popup (initially hidden)
             attribution_popup = gr.Markdown(visible=False, elem_id="attribution-popup")
-            
+
             proc_output_text = gr.Markdown(label="Processing Results")
             proc_output_comparisons = gr.Gallery(
-                label="Before & After Comparisons", 
+                label="Before & After Comparisons",
                 show_label=True,
                 elem_id="proc-gallery",
                 columns=3,
                 height="auto",
                 object_fit="contain"
             )
-            
+
             # Open folder button and hidden path storage
             with gr.Row():
                 open_folder_button = gr.Button(
-                    "📁 Open Output Folder", 
+                    "📁 Open Output Folder",
                     variant="secondary",
                     visible=False,
                     elem_id="open-folder-btn"
@@ -990,15 +992,15 @@ with gr.Blocks(
             proc_button.click(
                 fn=run_gradio_processing,
                 inputs=[
-                    proc_input, proc_model_path_hidden, proc_model_prompt_hidden, 
-                    proc_output_dir, proc_use_fp16, proc_contrast, 
+                    proc_input, proc_model_path_hidden, proc_model_prompt_hidden,
+                    proc_output_dir, proc_use_fp16, proc_contrast,
                     proc_patch_size, proc_overlap, proc_upscale,
                     proc_export_elements, proc_export_svg
                 ],
                 outputs=[proc_output_text, proc_output_comparisons, attribution_popup, open_folder_button, folder_path_hidden],
                 show_progress="full"
             )
-            
+
             # Add click handler for open folder button
             open_folder_button.click(
                 fn=open_folder,
@@ -1012,8 +1014,8 @@ with gr.Blocks(
             gr.HTML(f"""
             <div style="display: flex; align-items: center; padding: 30px; background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); border-radius: 12px; margin: 20px 0; border: 1px solid #d1d5db;">
                 <div style="margin-right: 25px;">
-                    <img src="data:image/png;base64,{img_data}" 
-                        alt="PyPotteryInk Logo" 
+                    <img src="data:image/png;base64,{img_data}"
+                        alt="PyPotteryInk Logo"
                         style="border-radius: 10px; width: 80px; height: 80px; object-fit: contain; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);"/>
                 </div>
                 <div>
@@ -1038,14 +1040,14 @@ with gr.Blocks(
                     You are using PyPotteryInk version <strong>1.0</strong>, a Generative AI tool for translating
                     archaeological pottery drawings into publication-ready illustrations.
                 </p>
-                
+
                 <h4 style="color: #92400e; margin: 20px 0 10px 0;">When publishing or presenting results that use PyPotteryInk, please include:</h4>
                 <ul style="color: #78350f; font-size: 15px; line-height: 1.5; margin-left: 20px;">
                     <li>The version of PyPotteryInk used</li>
                     <li>The specific model used (e.g., '10k Model' or '6h-MCG Model')</li>
                     <li>The number of images processed</li>
                 </ul>
-                
+
                 <h4 style="color: #92400e; margin: 20px 0 10px 0;">Suggested citation format:</h4>
                 <div style="background: #fef3c7; padding: 15px; border-radius: 6px; margin: 10px 0;">
                     <p style="color: #78350f; margin: 0; font-style: italic; font-size: 15px; line-height: 1.5;">
@@ -1067,7 +1069,7 @@ with gr.Blocks(
                     <strong>GitHub:</strong> <a href="https://github.com/lrncrd/PyPotteryInk" style="color: #5b21b6; text-decoration: underline;">https://github.com/lrncrd/PyPotteryInk</a><br>
                     <strong>Research Context:</strong> Archaeological pottery documentation and publication
                 </p>
-                
+
                 <p style="color: #6b46c1; margin: 0; font-size: 15px; line-height: 1.5;">
                     For questions, issues, or contributions, please visit the GitHub repository or contact the developer through the project's official channels.
                 </p>
@@ -1089,7 +1091,7 @@ if __name__ == "__main__":
     print("Starting PyPotteryInk Archaeological Pottery Enhancement Tool...")
     # Try to find an available port if 7860 is taken
     import socket
-    
+
     def find_free_port(start_port=7860, max_attempts=10):
         for port in range(start_port, start_port + max_attempts):
             try:
@@ -1099,14 +1101,14 @@ if __name__ == "__main__":
             except OSError:
                 continue
         return None
-    
+
     port = find_free_port()
     if port is None:
         print("❌ Could not find an available port. Please close other Gradio instances.")
         exit(1)
-    
+
     print(f"🌐 Using port: {port}")
-    
+
     demo.launch(
         debug=True,
         show_error=True,
