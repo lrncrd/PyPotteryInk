@@ -52,9 +52,10 @@ try:
 except ImportError:
     print("⚠️ models module not found - creating mock class")
     class Pix2Pix_Turbo:
-        def __init__(self, pretrained_path=None):
+        def __init__(self, pretrained_path=None, device=None):
             self.pretrained_path = pretrained_path
-            print(f"Mock Pix2Pix_Turbo model loaded from {pretrained_path}")
+            self.device = device if device else "cpu"
+            print(f"Mock Pix2Pix_Turbo model loaded from {pretrained_path} on {self.device}")
         
         def set_eval(self):
             print("Model set to evaluation mode")
@@ -67,17 +68,20 @@ MODEL_PATH = "models/10k.pth"
 IMAGE_URL = "https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/test_img.jpg"
 IMAGE_PATH = "test_input/test_img.jpg"
 
-def check_cuda():
-    """Check if CUDA is available"""
-    if not torch.cuda.is_available():
-        print("❌ CUDA is not available.")
-        print("🚨 You need CUDA to run this code.")
-        print("🚨 Please verify if your GPU is CUDA compatible")
-        # Interrompe l'esecuzione se CUDA non è disponibile
-        raise Exception("CUDA not available.")
-    else:
+def check_device():
+    """Check available computing device"""
+    if torch.cuda.is_available():
         print("✅ CUDA is available.")
-        return True
+        print(f"   GPU: {torch.cuda.get_device_name(0)}")
+        return "cuda"
+    elif torch.backends.mps.is_available():
+        print("✅ MPS (Metal Performance Shaders) is available.")
+        print("   Using Apple Silicon GPU acceleration")
+        return "mps"
+    else:
+        print("⚠️  No GPU acceleration available, using CPU.")
+        print("   Processing will be slower.")
+        return "cpu"
 
 def download_model(url, save_path):
     """Download the model if it doesn't exist"""
@@ -214,7 +218,7 @@ def test_pipeline():
                 "test_input/test_image_0.png",
                 model_path=MODEL_PATH,
                 output_dir="test_output",
-                use_fp16=True
+                use_fp16=use_fp16
             )
             assert os.path.exists(result)
             print("✅ Single image processing successful")
@@ -229,7 +233,7 @@ def test_pipeline():
                 "test_input",
                 model_path=MODEL_PATH,
                 output_dir="test_output",
-                use_fp16=True
+                use_fp16=use_fp16
             )
             assert isinstance(results, dict)
             print("✅ Batch processing successful")
@@ -277,8 +281,9 @@ if __name__ == "__main__":
     print("🚀 PyPotteryInk Test Suite")
     print("=" * 50)
     
-    # Check CUDA availability (non bloccante)
-    cuda_available = check_cuda()
+    # Check device availability
+    device_type = check_device()
+    use_fp16 = device_type == "cuda"  # FP16 only works with CUDA
     
     # Download model if needed
     try:

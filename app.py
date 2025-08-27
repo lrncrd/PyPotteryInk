@@ -117,6 +117,157 @@ def load_model_stats(model_name):
             return None
     return None
 
+def run_calculate_statistics_with_viz(input_images, save_path, generate_viz=True):
+    """Calculate statistics from images and optionally generate visualization plots"""
+    if not input_images:
+        return "❌ Please upload images for statistics calculation", None
+    
+    if not save_path:
+        save_path = "./custom_stats.npy"
+    
+    try:
+        # Save images to temp folder
+        clear_temp_dirs()
+        for img in input_images:
+            shutil.copy(img.name, TEMP_INPUT)
+        
+        from preprocessing import DatasetAnalyzer
+        analyzer = DatasetAnalyzer()
+        distributions = analyzer.analyze_dataset(TEMP_INPUT)
+        
+        # Save statistics
+        analyzer.save_analysis(save_path)
+        
+        # Create detailed statistics report
+        summary = f"""## ✅ Statistics Calculation Completed!
+
+**Images Analyzed:** {len(input_images)}
+**Statistics File:** {save_path}
+
+### 📊 Summary Table:
+
+| Metric | Mean | Std Dev | Min | Max | Median |
+|--------|------|---------|-----|-----|--------|"""
+        
+        # First add table rows
+        for metric_name, stats in distributions.items():
+            display_name = metric_name.replace('_', ' ').title()
+            summary += f"\n| {display_name} | {stats['mean']:.4f} | {stats['std']:.4f} | {stats['min']:.4f} | {stats['max']:.4f} | {stats['percentiles'][2]:.4f} |"
+        
+        summary += "\n\n### 📈 Detailed Analysis:\n"
+        
+        # Add detailed statistics for each metric
+        for metric_name, stats in distributions.items():
+            # Format metric name for display
+            display_name = metric_name.replace('_', ' ').title()
+            
+            summary += f"\n#### {display_name}:\n"
+            summary += f"- **Mean**: {stats['mean']:.4f}\n"
+            summary += f"- **Std Dev**: {stats['std']:.4f}\n"
+            summary += f"- **Min**: {stats['min']:.4f}\n"
+            summary += f"- **Max**: {stats['max']:.4f}\n"
+            summary += f"- **Percentiles** (5%, 25%, 50%, 75%, 95%):\n"
+            summary += f"  - {', '.join([f'{p:.4f}' for p in stats['percentiles']])}\n"
+            summary += f"- **Samples**: {stats['n_samples']}\n"
+        
+        summary += f"\n### 💾 File saved as: `{save_path}`\n"
+        summary += "\nThe statistics file is ready to use in the preprocessing section below."
+        
+        # Generate visualizations if requested
+        visualization_paths = []
+        if generate_viz:
+            try:
+                # Create visualization directory
+                viz_dir = os.path.join(TEMP_DIAGNOSTICS, "statistics_viz")
+                os.makedirs(viz_dir, exist_ok=True)
+                
+                # Create individual plots for each metric
+                import matplotlib.pyplot as plt
+                import matplotlib.patches as mpatches
+                
+                for metric_name, stats in distributions.items():
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    
+                    # Get values
+                    values = stats['values']
+                    
+                    # Create histogram with KDE
+                    counts, bins, patches = ax.hist(values, bins=30, density=True, 
+                                                   alpha=0.7, color='skyblue', 
+                                                   edgecolor='black', linewidth=1.2)
+                    
+                    # Add KDE curve if we have enough samples
+                    if len(values) > 5:
+                        from scipy import stats as scipy_stats
+                        kde = scipy_stats.gaussian_kde(values)
+                        x_range = np.linspace(min(values), max(values), 100)
+                        ax.plot(x_range, kde(x_range), 'r-', linewidth=2, label='KDE')
+                    
+                    # Add statistical markers
+                    ax.axvline(stats['mean'], color='green', linestyle='--', linewidth=2, label=f'Mean: {stats["mean"]:.4f}')
+                    ax.axvline(stats['percentiles'][2], color='orange', linestyle='--', linewidth=2, label=f'Median: {stats["percentiles"][2]:.4f}')
+                    
+                    # Add shaded regions for percentiles
+                    ax.axvspan(stats['percentiles'][1], stats['percentiles'][3], 
+                              alpha=0.2, color='gray', label='25th-75th percentile')
+                    
+                    # Labels and title
+                    display_name = metric_name.replace('_', ' ').title()
+                    ax.set_title(f'Distribution of {display_name}', fontsize=16, fontweight='bold')
+                    ax.set_xlabel(display_name, fontsize=12)
+                    ax.set_ylabel('Density', fontsize=12)
+                    ax.legend()
+                    ax.grid(True, alpha=0.3)
+                    
+                    # Save plot
+                    plot_path = os.path.join(viz_dir, f'{metric_name}_distribution.png')
+                    plt.tight_layout()
+                    plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+                    plt.close()
+                    
+                    visualization_paths.append(plot_path)
+                
+                # Create a combined overview plot
+                n_metrics = len(distributions)
+                fig, axes = plt.subplots(n_metrics, 1, figsize=(12, 4*n_metrics))
+                if n_metrics == 1:
+                    axes = [axes]
+                
+                for idx, (metric_name, stats) in enumerate(distributions.items()):
+                    ax = axes[idx]
+                    values = stats['values']
+                    
+                    # Box plot
+                    bp = ax.boxplot([values], vert=False, patch_artist=True, widths=0.6)
+                    bp['boxes'][0].set_facecolor('lightblue')
+                    bp['boxes'][0].set_alpha(0.7)
+                    
+                    # Add mean marker
+                    ax.scatter([stats['mean']], [1], color='red', s=100, zorder=5, label='Mean')
+                    
+                    # Labels
+                    display_name = metric_name.replace('_', ' ').title()
+                    ax.set_title(display_name, fontsize=14, fontweight='bold')
+                    ax.set_xlabel('Value', fontsize=12)
+                    ax.set_yticks([])
+                    ax.grid(True, axis='x', alpha=0.3)
+                    
+                plt.tight_layout()
+                overview_path = os.path.join(viz_dir, 'all_metrics_overview.png')
+                plt.savefig(overview_path, dpi=150, bbox_inches='tight')
+                plt.close()
+                
+                visualization_paths.insert(0, overview_path)
+                
+            except Exception as e:
+                print(f"Warning: Could not generate visualizations: {e}")
+                summary += f"\n⚠️ Visualization generation failed: {str(e)}"
+        
+        return summary, visualization_paths if visualization_paths else None
+        
+    except Exception as e:
+        return f"❌ Statistics calculation failed: {str(e)}", None
+
 def run_calculate_statistics(input_images, save_path):
     """Calculate statistics from images and save to .npy file"""
     if not input_images:
@@ -138,19 +289,31 @@ def run_calculate_statistics(input_images, save_path):
         # Save statistics
         analyzer.save_analysis(save_path)
         
+        # Create detailed statistics report
         summary = f"""## ✅ Statistics Calculation Completed!
 
 **Images Analyzed:** {len(input_images)}
 **Statistics File:** {save_path}
 
-### Calculated Metrics:
-- Mean brightness distribution
-- Standard deviation patterns  
-- Contrast ratio analysis
-- Dynamic range statistics
-
-The statistics file is ready to use in the preprocessing section below.
+### 📊 Detailed Statistics Report:
 """
+        
+        # Add detailed statistics for each metric
+        for metric_name, stats in distributions.items():
+            # Format metric name for display
+            display_name = metric_name.replace('_', ' ').title()
+            
+            summary += f"\n#### {display_name}:\n"
+            summary += f"- **Mean**: {stats['mean']:.4f}\n"
+            summary += f"- **Std Dev**: {stats['std']:.4f}\n"
+            summary += f"- **Min**: {stats['min']:.4f}\n"
+            summary += f"- **Max**: {stats['max']:.4f}\n"
+            summary += f"- **Percentiles** (5%, 25%, 50%, 75%, 95%):\n"
+            summary += f"  - {', '.join([f'{p:.4f}' for p in stats['percentiles']])}\n"
+            summary += f"- **Samples**: {stats['n_samples']}\n"
+        
+        summary += f"\n### 💾 File saved as: `{save_path}`\n"
+        summary += "\nThe statistics file is ready to use in the preprocessing section below."
         
         return summary
         
@@ -591,16 +754,28 @@ with gr.Blocks(
                         value="./custom_stats.npy",
                         info="Where to save calculated statistics"
                     )
+                    stats_visualize = gr.Checkbox(
+                        label="Generate visualization plots",
+                        value=True,
+                        info="Create graphs showing the statistical distributions"
+                    )
             
             with gr.Row():
                 stats_calc_button = gr.Button("Calculate Statistics", variant="secondary", size="lg")
             
             stats_calc_output = gr.Markdown(label="Statistics Calculation Results")
+            stats_visualization = gr.Gallery(
+                label="Statistical Distributions",
+                show_label=True,
+                columns=2,
+                height="auto",
+                object_fit="contain"
+            )
             
             stats_calc_button.click(
-                fn=run_calculate_statistics,
-                inputs=[stats_calc_input, stats_save_path],
-                outputs=[stats_calc_output]
+                fn=lambda imgs, path, viz: run_calculate_statistics_with_viz(imgs, path, viz),
+                inputs=[stats_calc_input, stats_save_path, stats_visualize],
+                outputs=[stats_calc_output, stats_visualization]
             )
             
             gr.HTML("<hr style='margin: 30px 0; border: 1px solid #e5e7eb;'>")
@@ -850,11 +1025,31 @@ with gr.Blocks(
 # Launch the app
 if __name__ == "__main__":
     print("Starting PyPotteryInk Archaeological Pottery Enhancement Tool...")
+    # Try to find an available port if 7860 is taken
+    import socket
+    
+    def find_free_port(start_port=7860, max_attempts=10):
+        for port in range(start_port, start_port + max_attempts):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('', port))
+                    return port
+            except OSError:
+                continue
+        return None
+    
+    port = find_free_port()
+    if port is None:
+        print("❌ Could not find an available port. Please close other Gradio instances.")
+        exit(1)
+    
+    print(f"🌐 Using port: {port}")
+    
     demo.launch(
         debug=True,
         show_error=True,
         share=False,
-        server_name="0.0.0.0",
-        server_port=7860,
+        server_name="127.0.0.1",
+        server_port=port,
         inbrowser=True
     )
