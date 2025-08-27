@@ -39,26 +39,19 @@ As part of the **PyPottery** toolkit, `PyPotteryInk` is a deep learning applicat
 - 🌐 **Web Interface**: User-friendly Gradio interface for easy access
 - 📊 **Preprocessing Tools**: Built-in image analysis and optimization with detailed statistics visualization
 - 🔧 **Easy Installation**: One-click installation scripts for all major operating systems
+- 📦 **Element Extraction**: Automatically extract individual pottery elements as separate high-resolution images
+- 🎨 **SVG Export**: Convert outputs to scalable vector graphics for publication flexibility
 
 ## 🚀 Quick Start
 
 ### Installation
 
-PyPotteryInk now includes automated installation scripts:
+PyPotteryInk includes a unified installation script that works on all platforms:
 
-#### Windows
 ```bash
 git clone https://github.com/lrncrd/PyPotteryInk.git
 cd PyPotteryInk
-install.bat
-```
-
-#### macOS / Linux
-```bash
-git clone https://github.com/lrncrd/PyPotteryInk.git
-cd PyPotteryInk
-chmod +x install.sh
-./install.sh
+python install.py
 ```
 
 The installation script will:
@@ -70,8 +63,8 @@ The installation script will:
 ### Running the Application
 
 After installation:
-- **Windows**: Double-click `run_app.bat` or run it from terminal
-- **macOS/Linux**: Run `./run_app.sh` or `python app.py`
+- **Windows**: Double-click `run.bat` or run it from terminal
+- **macOS/Linux**: Run `./run.sh` or `python app.py`
 
 The web interface will open automatically in your browser at `http://127.0.0.1:7860` (or the next available port).
 
@@ -84,6 +77,9 @@ The web interface will open automatically in your browser at `http://127.0.0.1:7
    - View distribution plots and summary tables
    - Apply optimizations based on statistical analysis
 4. **Batch Processing Tab**: Process multiple images with real-time progress
+   - **Advanced Export Options**:
+     - Extract individual pottery elements as separate high-resolution images
+     - Export to SVG format for scalable vector graphics
 
 ## 📚 Documentation
 
@@ -134,6 +130,14 @@ All models support custom fine-tuning for specific archaeological contexts or st
 - **CUDA (NVIDIA)**: Full support with FP16 optimization
 - **MPS (Apple Silicon)**: Full support with FP32 (automatic)
 - **CPU**: Fallback mode (significantly slower)
+
+### Optional Dependencies for Advanced Features
+
+#### SVG Export (requires potrace)
+To enable SVG export functionality, install potrace:
+- **macOS**: `brew install potrace`
+- **Linux**: `sudo apt-get install potrace`
+- **Windows**: Download from [potrace.sourceforge.net](http://potrace.sourceforge.net/#downloading)
 
 ## 📢 AI Disclosure and Citation
 
@@ -196,7 +200,6 @@ or
 
 
 Developed with ❤️ by [Lorenzo Cardarelli](https://github.com/lrncrd)
-</div>
 
 Based on img2img-turbo by [GaParmar](https://github.com/GaParmar/img2img-turbo)
 
@@ -220,6 +223,9 @@ The original code was released under the MIT Licence. The changes made in this f
   - Histogram and KDE visualizations
   - Box plots for metric overview
 - **Smart Port Management**: Automatic port selection if default port is busy
+- **Advanced Export Options**:
+  - Element extraction: Automatically identify and extract individual pottery elements
+  - SVG export: Convert processed images to scalable vector graphics for publication
 
 ## 🛠️ Development Setup
 
@@ -263,5 +269,37 @@ pip install -r requirements.txt
    - Ensure scipy is installed: `pip install scipy`
    - Check that you have at least 2 images for meaningful statistics
    - Verify the "Generate visualization plots" checkbox is enabled
+
+7. **SVG export not working**
+   - Install potrace (see Optional Dependencies section above)
+   - Ensure potrace is in your system PATH
+   - Check that the "Export SVG Versions" checkbox is enabled
+   - Note: SVG export works best with high-contrast binary images
+
+### Windows-Specific Notes
+
+1. **Testing Your Installation**
+   ```bash
+   python test_windows.py
+   ```
+   This will run a comprehensive test suite to verify your installation.
+
+2. **Debug Mode**
+   If you encounter issues, use the debug script:
+   ```bash
+   run_debug.bat
+   ```
+
+3. **CUDA Setup**
+   - Ensure NVIDIA drivers are up to date
+   - CUDA Toolkit 11.7+ recommended
+   - Check CUDA availability: `nvidia-smi`
+
+4. **Common Windows Issues**
+   - **DLL errors**: Install Visual C++ Redistributables
+   - **Long path issues**: Enable long path support in Windows
+   - **Permission errors**: Run as administrator if needed
+
+For detailed Windows testing procedures, see [WINDOWS_TESTING.md](WINDOWS_TESTING.md).
 
 ---

@@ -471,12 +471,24 @@ def run_gradio_diagnostics(input_images, model_path, prompt, patch_size, overlap
     
     return result_text, display_images
 
+def open_folder(path):
+    """Open a folder in the system's file explorer"""
+    import platform
+    import subprocess
+    
+    if platform.system() == 'Darwin':  # macOS
+        subprocess.Popen(['open', path])
+    elif platform.system() == 'Windows':  # Windows
+        subprocess.Popen(['explorer', path])
+    else:  # Linux and others
+        subprocess.Popen(['xdg-open', path])
+
 def run_gradio_processing(input_images, model_path, prompt, output_dir, use_fp16, contrast_scale,
-                          patch_size, overlap, upscale):
+                          patch_size, overlap, upscale, export_elements, export_svg, progress=gr.Progress()):
     if not input_images:
-        return "❌ No images to process", None, gr.update(visible=False)
+        return "❌ No images to process", None, gr.update(visible=False), gr.update(visible=False), ""
     if not model_path or not os.path.exists(model_path):
-        return "❌ Invalid model path", None, gr.update(visible=False)
+        return "❌ Invalid model path", None, gr.update(visible=False), gr.update(visible=False), ""
 
     # Show attribution reminder popup
     popup_message = gr.update(
@@ -498,6 +510,10 @@ def run_gradio_processing(input_images, model_path, prompt, output_dir, use_fp16
 
     # Run batch processing
     try:
+        # Create a progress callback
+        def update_progress(prog_value, status_text):
+            progress(prog_value, desc=status_text)
+        
         results = process_folder(
             input_folder=TEMP_INPUT,
             model_path=model_path,
@@ -507,7 +523,10 @@ def run_gradio_processing(input_images, model_path, prompt, output_dir, use_fp16
             contrast_scale=contrast_scale,
             patch_size=patch_size,
             overlap=overlap,
-            upscale=upscale
+            upscale=upscale,
+            progress_callback=update_progress,
+            export_elements=export_elements,
+            export_svg=export_svg
         )
 
         # Prepare comparison images for gallery
@@ -537,9 +556,12 @@ def run_gradio_processing(input_images, model_path, prompt, output_dir, use_fp16
             f"{gallery_note}"
         )
         
-        return summary, display_images, popup_message
+        # Show open folder button
+        open_folder_button = gr.update(visible=True)
+        
+        return summary, display_images, popup_message, open_folder_button, output_dir
     except Exception as e:
-        return f"❌ **Processing Error:**\n```\n{str(e)}\n```", None, popup_message
+        return f"❌ **Processing Error:**\n```\n{str(e)}\n```", None, popup_message, gr.update(visible=False), ""
 
 def run_hardware_check():
     """Wrapper function for hardware check"""
@@ -880,9 +902,9 @@ with gr.Blocks(
                     )
                 with gr.Column():
                     proc_use_fp16 = gr.Checkbox(
-                        label="Use FP16 Optimization", 
+                        label="Use FP16 Optimization (CUDA only)", 
                         value=True,
-                        info="Faster processing, less memory usage"
+                        info="Faster processing with NVIDIA GPUs - ignored on Apple Silicon/CPU"
                     )
 
             with gr.Row():
@@ -910,6 +932,27 @@ with gr.Blocks(
                         minimum=0, maximum=128, value=64, step=8, 
                         label="Patch Overlap"
                     )
+                    
+            # Advanced export options
+            gr.HTML("""
+            <div style="background: #ecfdf5; border: 1px solid #10b981; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                <h4 style="color: #065f46; margin-top: 0;">🎨 Advanced Export Options</h4>
+            </div>
+            """)
+            
+            with gr.Row():
+                with gr.Column():
+                    proc_export_elements = gr.Checkbox(
+                        label="Extract Individual Elements", 
+                        value=True,
+                        info="Extract individual pottery elements as separate high-res images"
+                    )
+                with gr.Column():
+                    proc_export_svg = gr.Checkbox(
+                        label="Export SVG Versions", 
+                        value=True,
+                        info="Convert outputs to scalable vector graphics (requires potrace)"
+                    )
             
             with gr.Row():
                 proc_button = gr.Button("Start Batch Processing", variant="primary", size="lg")
@@ -926,6 +969,16 @@ with gr.Blocks(
                 height="auto",
                 object_fit="contain"
             )
+            
+            # Open folder button and hidden path storage
+            with gr.Row():
+                open_folder_button = gr.Button(
+                    "📁 Open Output Folder", 
+                    variant="secondary",
+                    visible=False,
+                    elem_id="open-folder-btn"
+                )
+            folder_path_hidden = gr.Textbox(visible=False)
 
             # Event handlers for processing
             proc_model_dropdown.change(
@@ -939,9 +992,18 @@ with gr.Blocks(
                 inputs=[
                     proc_input, proc_model_path_hidden, proc_model_prompt_hidden, 
                     proc_output_dir, proc_use_fp16, proc_contrast, 
-                    proc_patch_size, proc_overlap, proc_upscale
+                    proc_patch_size, proc_overlap, proc_upscale,
+                    proc_export_elements, proc_export_svg
                 ],
-                outputs=[proc_output_text, proc_output_comparisons, attribution_popup]
+                outputs=[proc_output_text, proc_output_comparisons, attribution_popup, open_folder_button, folder_path_hidden],
+                show_progress="full"
+            )
+            
+            # Add click handler for open folder button
+            open_folder_button.click(
+                fn=open_folder,
+                inputs=[folder_path_hidden],
+                outputs=[]
             )
 
         # TAB 5: About & Disclaimer
