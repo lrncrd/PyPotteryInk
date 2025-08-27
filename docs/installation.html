@@ -193,6 +193,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
  <span class="menu-text">Training Guide</span></a>
   </div>
 </li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./docs_user_interface.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">User Interface</span></a>
+  </div>
+</li>
       </ul>
   </li>
         <li class="sidebar-item sidebar-item-section">
@@ -273,8 +279,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   <li><a href="#installation-steps" id="toc-installation-steps" class="nav-link" data-scroll-target="#installation-steps">Installation Steps</a>
   <ul class="collapse">
   <li><a href="#download-the-project" id="toc-download-the-project" class="nav-link" data-scroll-target="#download-the-project">1. Download the Project</a></li>
-  <li><a href="#install-dependencies" id="toc-install-dependencies" class="nav-link" data-scroll-target="#install-dependencies">2. Install Dependencies</a></li>
-  <li><a href="#verify-installation" id="toc-verify-installation" class="nav-link" data-scroll-target="#verify-installation">4. Verify Installation</a></li>
+  <li><a href="#a.-automatic-installation" id="toc-a.-automatic-installation" class="nav-link" data-scroll-target="#a.-automatic-installation">2a. Automatic installation</a></li>
+  <li><a href="#b.-manual-installation" id="toc-b.-manual-installation" class="nav-link" data-scroll-target="#b.-manual-installation">2b. Manual installation</a></li>
   </ul></li>
   <li><a href="#common-installation-issues" id="toc-common-installation-issues" class="nav-link" data-scroll-target="#common-installation-issues">Common Installation Issues</a>
   <ul class="collapse">
@@ -347,6 +353,27 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <div data-align="center">
 <p><a href="https://github.com/lrncrd/PyPotteryInk/releases"> <img src="https://img.shields.io/badge/⬇️%20Download%20Latest%20Release-PyPotteryInk-4A5568?style=for-the-badge&amp;logo=github&amp;logoColor=white" alt="Download Latest Release"> </a></p>
 </div>
+</section>
+<section id="a.-automatic-installation" class="level3">
+<h3 class="anchored" data-anchor-id="a.-automatic-installation">2a. Automatic installation</h3>
+<p>PyPotteryInk includes a unified installation script that works on all platforms:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/lrncrd/PyPotteryInk.git</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> PyPotteryInk</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> install.py</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>The installation script will: - Create a virtual environment</p>
+<p>- Install all dependencies</p>
+<p>- Download required models</p>
+<p>- Set up the application</p>
+<section id="running-the-application" class="level4">
+<h4 class="anchored" data-anchor-id="running-the-application">Running the Application</h4>
+<p>After installation:</p>
+<p>- <strong>Windows</strong>: Double-click <code>run.bat</code> or run it from terminal</p>
+<p>- <strong>macOS/Linux</strong>: Run <code>./run.sh</code> or <code>python app.py</code></p>
+<p>The web interface will open automatically in your browser at <code>http://127.0.0.1:7860</code> (or the next available port).</p>
+</section>
+</section>
+<section id="b.-manual-installation" class="level3">
+<h3 class="anchored" data-anchor-id="b.-manual-installation">2b. Manual installation</h3>
 <p>After downloading, extract the package to your desired location. The folder structure should look like this:</p>
 <pre><code>pypotteryink/
 ├── requirements.txt
@@ -358,18 +385,18 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 ├── test.py
 ├── utils.py
 └── Montale_stats.npy</code></pre>
-</section>
-<section id="install-dependencies" class="level3">
-<h3 class="anchored" data-anchor-id="install-dependencies">2. Install Dependencies</h3>
+<section id="install-dependencies" class="level4">
+<h4 class="anchored" data-anchor-id="install-dependencies">Install Dependencies</h4>
 <p>Move to the downloaded folder and run this command</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-r</span> requirements.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">pip</span> install <span class="at">-r</span> requirements.txt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <p>The installation might take several minutes depending on your internet connection.</p>
 </section>
-<section id="verify-installation" class="level3">
-<h3 class="anchored" data-anchor-id="verify-installation">4. Verify Installation</h3>
+<section id="verify-installation" class="level4">
+<h4 class="anchored" data-anchor-id="verify-installation">Verify Installation</h4>
 <p>After installation, you can verify everything is working correctly. Move into the folder and run</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>python test.py</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>python test.py</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <p>The test will detect CUDA installation and run some functions to a test image.</p>
+</section>
 </section>
 </section>
 <section id="common-installation-issues" class="level2">
@@ -381,7 +408,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <li>Ensure you have the NVIDIA drivers installed</li>
 <li>Verify CUDA installation by running:</li>
 </ol>
-<div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">nvidia-smi</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">nvidia-smi</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <ol start="3" type="1">
 <li>Make sure your GPU is CUDA-capable and properly recognised</li>
 </ol>

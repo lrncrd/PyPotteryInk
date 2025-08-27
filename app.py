@@ -11,6 +11,8 @@ from ink import run_diagnostics, process_folder  # Make sure the file is saved
 from preprocessing import DatasetAnalyzer, apply_recommended_adjustments, process_folder_metrics, visualize_metrics_change, check_image_quality
 import numpy as np
 
+version = "1.0.0"
+
 # Configuration of models with automatic prompts
 MODELS = {
     "10k Model": {
@@ -585,7 +587,91 @@ def on_model_select(selection):
 
 with gr.Blocks(
     title="PyPotteryInk",
+    theme="default",
     css="""
+    /* Force light theme and hide theme selector */
+    .theme-toggle {
+        display: none !important;
+    }
+    
+    /* Ensure light theme styling */
+    :root {
+        color-scheme: light !important;
+    }
+    
+    html[data-theme="dark"],
+    .dark {
+        color-scheme: light !important;
+    }
+    
+    /* Force light theme regardless of system preference */
+    .gradio-container {
+        background-color: #ffffff !important;
+        color: #374151 !important;
+    }
+    
+    /* Override dark theme variables */
+    .dark .gradio-container,
+    [data-theme="dark"] .gradio-container,
+    .dark,
+    [data-theme="dark"] {
+        --background-fill-primary: #ffffff !important;
+        --background-fill-secondary: #f9fafb !important;
+        --body-background-fill: #ffffff !important;
+        --body-text-color: #374151 !important;
+        --border-color-primary: #e5e7eb !important;
+        --color-accent: #3b82f6 !important;
+        --color-accent-soft: #dbeafe !important;
+        --neutral-50: #f9fafb !important;
+        --neutral-100: #f3f4f6 !important;
+        --neutral-200: #e5e7eb !important;
+        --neutral-300: #d1d5db !important;
+        --neutral-400: #9ca3af !important;
+        --neutral-500: #6b7280 !important;
+        --neutral-600: #4b5563 !important;
+        --neutral-700: #374151 !important;
+        --neutral-800: #1f2937 !important;
+        --neutral-900: #111827 !important;
+    }
+    
+    /* Force light theme styling for all elements */
+    .dark *,
+    [data-theme="dark"] * {
+        background-color: inherit !important;
+        color: inherit !important;
+    }
+    
+    /* Specific overrides for common dark theme elements */
+    .dark .gr-box,
+    [data-theme="dark"] .gr-box {
+        background-color: #ffffff !important;
+        border-color: #e5e7eb !important;
+    }
+    
+    .dark .gr-input,
+    [data-theme="dark"] .gr-input,
+    .dark input,
+    [data-theme="dark"] input,
+    .dark textarea,
+    [data-theme="dark"] textarea {
+        background-color: #ffffff !important;
+        color: #374151 !important;
+        border-color: #d1d5db !important;
+    }
+    
+    .dark .gr-button,
+    [data-theme="dark"] .gr-button {
+        background-color: #f3f4f6 !important;
+        color: #374151 !important;
+        border-color: #d1d5db !important;
+    }
+    
+    .dark .gr-button.gr-button-primary,
+    [data-theme="dark"] .gr-button.gr-button-primary {
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
+    }
+
     #attribution-popup {
         background: #fef3c7 !important;
         border: 2px solid #f59e0b !important;
@@ -604,6 +690,67 @@ with gr.Blocks(
         color: #92400e !important;
         font-weight: 500 !important;
         margin: 0 !important;
+    }
+    """,
+    js="""
+    function() {
+        // Force light theme on load
+        const setLightTheme = () => {
+            // Remove dark theme classes
+            document.documentElement.classList.remove('dark');
+            document.body.classList.remove('dark');
+            
+            // Set light theme attribute
+            document.documentElement.setAttribute('data-theme', 'light');
+            
+            // Find and set theme toggle to light if it exists
+            const themeToggle = document.querySelector('[data-testid="theme-toggle"]') || 
+                              document.querySelector('.theme-toggle') ||
+                              document.querySelector('button[aria-label*="theme"]');
+            
+            if (themeToggle) {
+                // Hide the theme toggle
+                themeToggle.style.display = 'none';
+            }
+            
+            // Override localStorage theme setting
+            localStorage.setItem('theme', 'light');
+            localStorage.setItem('gradio-theme', 'light');
+        };
+        
+        // Set theme immediately
+        setLightTheme();
+        
+        // Set theme after DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setLightTheme);
+        }
+        
+        // Monitor for theme changes and override them
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && 
+                   (mutation.attributeName === 'class' || mutation.attributeName === 'data-theme')) {
+                    if (document.documentElement.classList.contains('dark') || 
+                        document.documentElement.getAttribute('data-theme') === 'dark') {
+                        setLightTheme();
+                    }
+                }
+            });
+        });
+        
+        observer.observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class', 'data-theme']
+        });
+        
+        // Also monitor body for theme changes
+        observer.observe(document.body, {
+            attributes: true,
+            attributeFilter: ['class', 'data-theme']
+        });
+        
+        return "Light theme enforced";
     }
     """
 ) as demo:
@@ -626,7 +773,7 @@ with gr.Blocks(
                 PyPotteryInk
             </h1>
             <p style="color: #6b7280; font-size: 1.1em; margin: 8px 0 0 0;">
-                v1.0 - AI-Powered Archaeological Pottery Enhancement
+                v{version} - A deep learning Python package for automating the digital inking process of archaeological pottery drawings
             </p>
         </div>
     </div>
@@ -1026,18 +1173,18 @@ with gr.Blocks(
                         AI-Powered Archaeological Pottery Enhancement
                     </p>
                     <p style="color: #9ca3af; font-size: 1em; margin: 0;">
-                        Version 1.0 • August 2025
+                        Version {version} • August 2025
                     </p>
                 </div>
             </div>
             """)
 
             # Disclosure requirement
-            gr.HTML("""
+            gr.HTML(f"""
             <div style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); border-left: 4px solid #f59e0b; padding: 25px; border-radius: 8px; margin: 25px 0;">
                 <h3 style="color: #92400e; margin-top: 0; font-size: 1.4em;">📢 AI DISCLOSURE REQUIREMENT</h3>
                 <p style="color: #78350f; margin-bottom: 15px; font-size: 16px; line-height: 1.6;">
-                    You are using PyPotteryInk version <strong>1.0</strong>, a Generative AI tool for translating
+                    You are using PyPotteryInk <strong>{version}</strong>, a Generative AI tool for translating
                     archaeological pottery drawings into publication-ready illustrations.
                 </p>
 
@@ -1051,7 +1198,7 @@ with gr.Blocks(
                 <h4 style="color: #92400e; margin: 20px 0 10px 0;">Suggested citation format:</h4>
                 <div style="background: #fef3c7; padding: 15px; border-radius: 6px; margin: 10px 0;">
                     <p style="color: #78350f; margin: 0; font-style: italic; font-size: 15px; line-height: 1.5;">
-                        "This research utilized PyPotteryInk (version 1.0) for the AI-assisted
+                        "This research utilized PyPotteryInk (version {version}) for the AI-assisted
                         translation of [number] pottery drawings. PyPotteryInk is a generative AI tool
                         developed by Lorenzo Cardarelli (<a href="https://github.com/lrncrd/PyPotteryInk" style="color: #92400e; text-decoration: underline;">https://github.com/lrncrd/PyPotteryInk</a>)."
                     </p>
@@ -1077,11 +1224,11 @@ with gr.Blocks(
             """)
 
     # Informative footer
-    gr.HTML("""
+    gr.HTML(f"""
     <div style="margin-top: 30px; padding: 20px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; text-align: center;">
         <p style="margin: 0; font-size: 14px; color: #6b7280;">
-            <strong>PyPotteryInk</strong> - Advanced AI tool for archaeological pottery drawing enhancement<br>
-            <em>Experimental tool - Ensure you have rights to process uploaded images and models</em>
+            <strong>PyPotteryInk</strong> - A deep learning Python package for automating the digital inking process of archaeological pottery drawings<br>
+            <em>Ensure you have rights to process uploaded images and models</em>
         </p>
     </div>
     """)

@@ -4,7 +4,7 @@
 
 <img src="imgs/pypotteryink.png" width="250"/>
 
-[![Version](https://img.shields.io/badge/version-1.0-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![Documentation](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![HuggingFace](https://img.shields.io/badge/🤗%20Models-PyPotteryInk-yellow.svg)](https://huggingface.co/lrncrd/PyPotteryInk)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -68,7 +68,13 @@ After installation:
 
 The web interface will open automatically in your browser at `http://127.0.0.1:7860` (or the next available port).
 
-### Key Features in the Web Interface
+### Web Interface
+
+Version 1.0.0 introduces a user-friendly web interface powered by Gradio.
+
+<div align="center">
+<img src="imgs/gui_example.png" width="800"/>
+</div>
 
 1. **Hardware Check Tab**: Verify your system meets requirements
 2. **Model Diagnostics Tab**: Test different settings before processing
@@ -106,8 +112,8 @@ All models support custom fine-tuning for specific archaeological contexts or st
 
 | GPU                 | Processing time for `test_image.jpg` (s) | FP16 Support |
 | ------------------- | -------------------------------- | ------------ |
-| 3070Ti (Windows 11) | 51.48                            | ✅ Yes        |
-| T4 (Google Colab)   | 57.56                            | ✅ Yes        |
+| 3070Ti (Windows 11) | ~50-55                     | ✅ Yes        |
+| T4 (Google Colab)   | ~55-60                           | ✅ Yes        |
 | M2 Pro (macOS)      | ~65-75                          | ❌ No (FP32)  |
 | M1 (macOS)          | ~80-90                          | ❌ No (FP32)  |
 | CPU (i7-9700K)     | ~300-400                        | ❌ No (FP32)  |
@@ -192,7 +198,6 @@ or
 
 ## 👥 Contributors
 
-
 <a href="https://github.com/lrncrd/PyPotteryInk/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=lrncrd/PyPotteryInk" />
 </a>
@@ -243,63 +248,31 @@ pip install -r requirements.txt
 
 ### Common Issues
 
-1. **"AttributeError: 'AutoencoderKL' object has no attribute 'add_adapter'"**
-   - Solution: The code now handles this automatically with fallback methods
 
-2. **Slow processing on Apple Silicon**
-   - This is normal - MPS is slower than CUDA but faster than CPU
-   - Processing uses FP32 on MPS for stability
-
-3. **Out of memory errors**
+1. **Out of memory errors**
    - Reduce patch size in settings (try 384 or 256)
    - Close other applications
    - Use CPU mode as fallback (slower but more stable)
 
-4. **Models not downloading**
+2. **Models not downloading**
    - Check your internet connection
    - Models are downloaded from Hugging Face (may be blocked in some regions)
    - Manual download links are available in the table above
 
-5. **Port already in use error**
+3. **Port already in use error**
    - The app now automatically finds an available port
    - If you see this error with older versions, close other Gradio instances
    - Or manually specify a port: `GRADIO_SERVER_PORT=7861 python app.py`
 
-6. **Statistics visualization not showing**
+4. **Statistics visualization not showing**
    - Ensure scipy is installed: `pip install scipy`
    - Check that you have at least 2 images for meaningful statistics
    - Verify the "Generate visualization plots" checkbox is enabled
 
-7. **SVG export not working**
+5. **SVG export not working**
    - Install potrace (see Optional Dependencies section above)
    - Ensure potrace is in your system PATH
    - Check that the "Export SVG Versions" checkbox is enabled
    - Note: SVG export works best with high-contrast binary images
-
-### Windows-Specific Notes
-
-1. **Testing Your Installation**
-   ```bash
-   python test_windows.py
-   ```
-   This will run a comprehensive test suite to verify your installation.
-
-2. **Debug Mode**
-   If you encounter issues, use the debug script:
-   ```bash
-   run_debug.bat
-   ```
-
-3. **CUDA Setup**
-   - Ensure NVIDIA drivers are up to date
-   - CUDA Toolkit 11.7+ recommended
-   - Check CUDA availability: `nvidia-smi`
-
-4. **Common Windows Issues**
-   - **DLL errors**: Install Visual C++ Redistributables
-   - **Long path issues**: Enable long path support in Windows
-   - **Permission errors**: Run as administrator if needed
-
-For detailed Windows testing procedures, see [WINDOWS_TESTING.md](WINDOWS_TESTING.md).
 
 ---
