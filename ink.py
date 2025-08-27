@@ -437,6 +437,9 @@ def process_folder(
     overlap: int = 64,
     file_extensions: Tuple[str, ...] = ('.jpg', '.jpeg', '.png'),
     upscale: int = 1,
+    progress_callback=None,
+    export_elements: bool = True,
+    export_svg: bool = True,
 ):
     """Process a folder of images using improved patch strategy.
 
@@ -491,6 +494,15 @@ def process_folder(
             input_path = os.path.join(input_folder, image_file)
             print(f"\n\n🖼️ Processing image {idx}/{len(image_files)}: {image_file}")
             log.write(f"\nProcessing image {idx}/{len(image_files)}: {image_file}\n")
+            
+            # Update progress if callback provided
+            if progress_callback:
+                progress = (idx - 1) / len(image_files)
+                status_text = f"Processing image {idx}/{len(image_files)}: {image_file}"
+                try:
+                    progress_callback(progress, status_text)
+                except Exception as e:
+                    print(f"Warning: Progress callback error: {e}")
 
             start_time = time.time()
 
@@ -525,6 +537,15 @@ def process_folder(
 
                 with torch.no_grad():
                     for patch_idx in tqdm(range(total_patches), desc=f"Processing {image_file}"):
+                        # Update progress for each patch if callback provided
+                        if progress_callback and patch_idx % 5 == 0:  # Update every 5 patches
+                            patch_progress = (idx - 1 + patch_idx / total_patches) / len(image_files)
+                            patch_status = f"Processing image {idx}/{len(image_files)}: {image_file} - Patch {patch_idx+1}/{total_patches}"
+                            try:
+                                progress_callback(patch_progress, patch_status)
+                            except Exception as e:
+                                print(f"Warning: Progress callback error: {e}")
+                        
                         x_start, y_start, x_end, y_end, row, col = get_patch_coordinates(
                             patch_idx, patches_per_row, num_rows, width, height, patch_size, overlap
                         )
@@ -572,12 +593,31 @@ def process_folder(
                 log.write("Status: Success\n")
 
                 successful_conversions += 1
+                
+                # Update progress to complete this image
+                if progress_callback:
+                    progress = idx / len(image_files)
+                    status_text = f"Completed {idx}/{len(image_files)} images"
+                    try:
+                        progress_callback(progress, status_text)
+                    except Exception as e:
+                        print(f"Warning: Progress callback error: {e}")
 
             except Exception as e:
                 print(f"❌ Error processing {image_file}: {str(e)}")
                 log.write(f"Status: Failed - {str(e)}\n")
                 failed_conversions += 1
                 failed_files.append(image_file)
+                
+                # Update progress even on error
+                if progress_callback:
+                    progress = idx / len(image_files)
+                    status_text = f"Error on image {idx}/{len(image_files)}: {image_file}"
+                    try:
+                        progress_callback(progress, status_text)
+                    except Exception as e:
+                        print(f"Warning: Progress callback error: {e}")
+                    
                 continue
 
             finally:
@@ -641,6 +681,52 @@ def process_folder(
                 continue
 
     print(f"\n✅ Comparison visualisations saved in: {comparison_dir}")
+    
+    # Export additional formats if requested
+    if export_elements or export_svg:
+        print("\n🎨 Generating advanced exports...")
+        from export_utils import export_all_formats, create_enhanced_comparison
+        
+        enhanced_comparisons = []
+        exported_elements = []
+        exported_svgs = []
+        
+        for idx, image_file in enumerate(image_files, 1):
+            if image_file not in failed_files:
+                try:
+                    print(f"\rExporting formats for {image_file} ({idx}/{len(image_files)})", end="")
+                    
+                    output_path = os.path.join(output_dir, image_file)
+                    input_path = os.path.join(input_folder, image_file)
+                    
+                    # Export in multiple formats
+                    export_results = export_all_formats(output_path, output_dir)
+                    
+                    # Create enhanced comparison with elements
+                    if export_results['elements']:
+                        enhanced_comp = create_enhanced_comparison(
+                            input_path, output_path, 
+                            export_results['elements'], output_dir
+                        )
+                        if enhanced_comp:
+                            enhanced_comparisons.append(enhanced_comp)
+                    
+                    exported_elements.extend(export_results['elements'])
+                    if export_results['svg']:
+                        exported_svgs.append(export_results['svg'])
+                    exported_svgs.extend(export_results['elements_svg'])
+                    
+                except Exception as e:
+                    print(f"\n⚠️ Error exporting formats for {image_file}: {str(e)}")
+                    continue
+        
+        print(f"\n✅ Advanced exports complete!")
+        if exported_elements:
+            print(f"  📦 Extracted {len(exported_elements)} pottery elements")
+        if exported_svgs:
+            print(f"  🎨 Created {len(exported_svgs)} SVG files")
+        if enhanced_comparisons:
+            print(f"  🖼️ Generated {len(enhanced_comparisons)} enhanced comparisons")
 
     results = {
         'successful': successful_conversions,
@@ -649,6 +735,9 @@ def process_folder(
         'average_time': sum(processing_times)/len(processing_times) if processing_times else 0,
         'log_file': log_file,
         'comparison_dir': comparison_dir,
+        'exported_elements': exported_elements if export_elements else [],
+        'exported_svgs': exported_svgs if export_svg else [],
+        'enhanced_comparisons': enhanced_comparisons if export_elements else []
     }
 
     return results
