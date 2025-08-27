@@ -14,3 +14,4 @@ matplotlib
 scikit-image
 seaborn
 gradio
+scipy

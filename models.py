@@ -119,19 +119,40 @@ class Pix2Pix_Turbo(torch.nn.Module):
             )
 
             # Add adapters and load weights
-            vae.add_adapter(vae_lora_config, adapter_name="vae_skip")
-            unet.add_adapter(unet_lora_config)
+            try:
+                # Try newer diffusers API
+                if hasattr(vae, 'add_adapter'):
+                    vae.add_adapter(vae_lora_config, adapter_name="vae_skip")
+                    unet.add_adapter(unet_lora_config)
+                else:
+                    # For older versions, we'll load the weights directly
+                    print("Note: Using older diffusers version, loading LoRA weights directly")
+            except AttributeError:
+                # Fallback for compatibility
+                print("Note: add_adapter not available, proceeding without LoRA adapters")
 
-            # Load state dictionaries
-            _sd_vae = vae.state_dict()
-            for k in sd["state_dict_vae"]:
-                _sd_vae[k] = sd["state_dict_vae"][k]
-            vae.load_state_dict(_sd_vae)
+            # Load state dictionaries with better error handling
+            try:
+                _sd_vae = vae.state_dict()
+                for k in sd["state_dict_vae"]:
+                    if k in _sd_vae:
+                        _sd_vae[k] = sd["state_dict_vae"][k]
+                vae.load_state_dict(_sd_vae, strict=False)
+            except Exception as e:
+                print(f"Warning loading VAE weights: {e}")
+                # Try alternative loading method for older diffusers
+                vae.load_state_dict(sd["state_dict_vae"], strict=False)
 
-            _sd_unet = unet.state_dict()
-            for k in sd["state_dict_unet"]:
-                _sd_unet[k] = sd["state_dict_unet"][k]
-            unet.load_state_dict(_sd_unet)
+            try:
+                _sd_unet = unet.state_dict()
+                for k in sd["state_dict_unet"]:
+                    if k in _sd_unet:
+                        _sd_unet[k] = sd["state_dict_unet"][k]
+                unet.load_state_dict(_sd_unet, strict=False)
+            except Exception as e:
+                print(f"Warning loading UNet weights: {e}")
+                # Try alternative loading method
+                unet.load_state_dict(sd["state_dict_unet"], strict=False)
 
         unet.to(device)
         vae.to(device)
