@@ -188,3 +188,6 @@ output
 BK 
 docs
 
+/custom_stats.npy
+/test_progress_direct.py
+/test_progress.py
