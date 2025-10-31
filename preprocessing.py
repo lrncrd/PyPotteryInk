@@ -22,10 +22,10 @@ class DatasetAnalyzer:
                 image (PIL.Image or str): Image object or path to the image file.
             Returns:
                 dict: Dictionary containing extracted metrics.
-        analyze_dataset(dataset_path, file_pattern=('.png', '.jpg', '.jpeg')):
+        analyze_dataset(dataset_path, file_pattern=('.png', '.jpg', '.jpeg', '.tif', '.tiff')):
             Analyze entire dataset and build statistical distributions.
                 dataset_path (str): Path to dataset folder.
-                file_pattern (tuple): Tuple of valid file extensions. Default: ('.png', '.jpg', '.jpeg').
+                file_pattern (tuple): Tuple of valid file extensions. Default: ('.png', '.jpg', '.jpeg', '.tif', '.tiff').
             Returns:
                 dict: Dictionary containing statistical distributions of metrics.
         visualize_distributions_kde(metrics_to_plot=None, save=False):
@@ -98,11 +98,11 @@ class DatasetAnalyzer:
         }
     
     
-    def analyze_dataset(self, dataset_path, file_pattern=('.png', '.jpg', '.jpeg')):
+    def analyze_dataset(self, dataset_path, file_pattern=('.png', '.jpg', '.jpeg', '.tif', '.tiff')):
         """Analyze entire dataset and build statistical distributions
         Args:
             dataset_path (str): Path to dataset folder.
-            file_pattern (tuple): Tuple of valid file extensions. Default: ('.png', '.jpg', '.jpeg')
+            file_pattern (tuple): Tuple of valid file extensions. Default: ('.png', '.jpg', '.jpeg', '.tif', '.tiff')
         
         """
         all_metrics = []
@@ -256,14 +256,14 @@ class DatasetAnalyzer:
         return analyzer
 
 
-def process_folder_metrics(input_folder, model_stats, file_extensions=('.jpg', '.jpeg', '.png')):
+def process_folder_metrics(input_folder, model_stats, file_extensions=('.jpg', '.jpeg', '.png', '.tif', '.tiff')):
     """
     Process all images in a folder.
     
     Args:
         input_folder (str): Path to input images
         model_stats (dict): Dictionary of model statistics from analyzer
-        file_extensions (list): Tuple of valid file extensions. Default: ('.jpg', '.jpeg', '.png')
+        file_extensions (list): Tuple of valid file extensions. Default: ('.jpg', '.jpeg', '.png', '.tif', '.tiff')
     """
     output_folder = input_folder + "_adjusted"
     os.makedirs(output_folder, exist_ok=True)

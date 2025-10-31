@@ -213,9 +213,9 @@ def run_diagnostics(
     print("\n🔍 Running pre-processing diagnostics...")
     os.makedirs(output_dir, exist_ok=True)
 
-    # Collect image files
+    # Collect image files (including TIFF)
     image_files = []
-    for ext in ['.jpg', '.jpeg', '.png']:
+    for ext in ['.jpg', '.jpeg', '.png', '.tif', '.tiff']:
         image_files.extend([f for f in os.listdir(input_folder) if f.lower().endswith(ext)])
 
     if not image_files:
@@ -435,7 +435,7 @@ def process_folder(
     contrast_scale: float = 1,
     patch_size: int = 512,
     overlap: int = 64,
-    file_extensions: Tuple[str, ...] = ('.jpg', '.jpeg', '.png'),
+    file_extensions: Tuple[str, ...] = ('.jpg', '.jpeg', '.png', '.tif', '.tiff'),
     upscale: int = 1,
     progress_callback=None,
     export_elements: bool = True,
@@ -500,7 +500,7 @@ def process_folder(
                 progress = (idx - 1) / len(image_files)
                 status_text = f"Processing image {idx}/{len(image_files)}: {image_file}"
                 try:
-                    progress_callback(progress, status_text)
+                    progress_callback(progress, status_text, 0, f"Starting patch processing...")
                 except Exception as e:
                     print(f"Warning: Progress callback error: {e}")
 
@@ -538,11 +538,12 @@ def process_folder(
                 with torch.no_grad():
                     for patch_idx in tqdm(range(total_patches), desc=f"Processing {image_file}"):
                         # Update progress for each patch if callback provided
-                        if progress_callback and patch_idx % 5 == 0:  # Update every 5 patches
-                            patch_progress = (idx - 1 + patch_idx / total_patches) / len(image_files)
-                            patch_status = f"Processing image {idx}/{len(image_files)}: {image_file} - Patch {patch_idx+1}/{total_patches}"
+                        if progress_callback:
+                            overall_progress = (idx - 1) / len(image_files)
+                            patch_progress = patch_idx / total_patches
+                            patch_status = f"Patch {patch_idx+1}/{total_patches}"
                             try:
-                                progress_callback(patch_progress, patch_status)
+                                progress_callback(overall_progress, f"Image {idx}/{len(image_files)}", patch_progress, patch_status)
                             except Exception as e:
                                 print(f"Warning: Progress callback error: {e}")
                         
@@ -599,7 +600,7 @@ def process_folder(
                     progress = idx / len(image_files)
                     status_text = f"Completed {idx}/{len(image_files)} images"
                     try:
-                        progress_callback(progress, status_text)
+                        progress_callback(progress, status_text, 1.0, "All patches completed")
                     except Exception as e:
                         print(f"Warning: Progress callback error: {e}")
 

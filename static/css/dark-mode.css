@@ -1,0 +1,200 @@
+/* Dark Mode Styles for PyPotteryInk */
+
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f9fafb;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --border-color: #e5e7eb;
+    --primary-color: #3b82f6;
+    --secondary-color: #8b5cf6;
+    --success-color: #10b981;
+    --error-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #3b82f6;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode variables */
+body.dark-mode {
+    --bg-primary: #1f2937;
+    --bg-secondary: #111827;
+    --text-primary: #f9fafb;
+    --text-secondary: #9ca3af;
+    --border-color: #374151;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-mode {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+body.dark-mode .container {
+    background-color: var(--bg-secondary);
+}
+
+body.dark-mode .panel {
+    background-color: var(--bg-primary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .app-header {
+    background-color: var(--bg-primary);
+    border-bottom-color: var(--border-color);
+}
+
+body.dark-mode .tab-button {
+    background-color: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .tab-button:hover {
+    background-color: var(--bg-primary);
+}
+
+body.dark-mode .tab-button.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+body.dark-mode .form-control,
+body.dark-mode .form-control select,
+body.dark-mode input[type="text"],
+body.dark-mode input[type="number"],
+body.dark-mode textarea,
+body.dark-mode select {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .form-control:focus {
+    border-color: var(--primary-color);
+    background-color: var(--bg-primary);
+}
+
+body.dark-mode .btn-secondary {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .btn-secondary:hover:not(:disabled) {
+    background-color: var(--bg-primary);
+}
+
+body.dark-mode .info-box {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .report-container {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .image-upload-area {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .image-upload-area:hover {
+    border-color: var(--primary-color);
+    background-color: var(--bg-primary);
+}
+
+body.dark-mode .upload-placeholder {
+    color: var(--text-secondary);
+}
+
+body.dark-mode .preview-item {
+    background-color: var(--bg-primary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .modal-content {
+    background-color: var(--bg-primary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .modal-header {
+    border-bottom-color: var(--border-color);
+}
+
+body.dark-mode .citation-box {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .disclosure-section {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode code {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+body.dark-mode .about-links .btn-secondary {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .about-links .btn-secondary:hover {
+    background-color: var(--bg-primary);
+}
+
+/* Tooltip dark mode */
+body.dark-mode .info-tooltip:hover::after {
+    background: #374151;
+}
+
+body.dark-mode .info-tooltip:hover::before {
+    border-top-color: #374151;
+}
+
+/* Message dark mode */
+body.dark-mode .message-success {
+    background: #064e3b;
+    color: #6ee7b7;
+    border-color: #10b981;
+}
+
+body.dark-mode .message-error {
+    background: #7f1d1d;
+    color: #fca5a5;
+    border-color: #ef4444;
+}
+
+body.dark-mode .message-info {
+    background: #1e3a8a;
+    color: #93c5fd;
+    border-color: #3b82f6;
+}
+
+body.dark-mode .message-warning {
+    background: #78350f;
+    color: #fcd34d;
+    border-color: #f59e0b;
+}
+
+/* Scroll bar dark mode */
+body.dark-mode ::-webkit-scrollbar {
+    background-color: var(--bg-secondary);
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb {
+    background-color: var(--border-color);
+}
+
+body.dark-mode ::-webkit-scrollbar-thumb:hover {
+    background-color: #4b5563;
+}

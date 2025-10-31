@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyPotteryInk - Archaeological Pottery Enhancement Tool</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="splash-screen">
+        <div class="splash-content">
+            <img src="{{ url_for('static', filename='images/pypotteryink.png') }}" alt="PyPotteryInk Logo" class="splash-logo">
+            <div class="splash-spinner"></div>
+            <h1 class="splash-title">PyPotteryInk</h1>
+            <p class="splash-message" id="splash-message">Initializing application...</p>
+            
+            <div class="splash-progress">
+                <div class="splash-progress-bar" id="splash-progress-bar" style="width: 0%">
+                    <span id="splash-progress-text">0%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container" id="main-container" style="display: none;">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-top">
+                <div class="logo-section">
+                    <img src="{{ url_for('static', filename='images/pypotteryink.png') }}" alt="PyPotteryInk Logo" class="logo">
+                    <div>
+                        <h1>PyPotteryInk</h1>
+                        <p class="version">v{{ version }}</p>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button id="theme-toggle" class="icon-btn" aria-label="Toggle Dark Mode">
+                        <span class="theme-icon">🌙</span>
+                    </button>
+                    <button id="info-btn" class="icon-btn" aria-label="About & Info">
+                        <span class="info-icon">ℹ️</span>
+                    </button>
+                </div>
+            </div>
+            <div class="header-subtitle">
+                A deep learning Python package for automating the digital inking process of archaeological pottery drawings
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-button active" data-tab="hardware-tab">
+                <span class="tab-icon">⚙️</span>
+                <span class="tab-label">Hardware Check</span>
+            </button>
+            <button class="tab-button" data-tab="diagnostics-tab">
+                <span class="tab-icon">🔍</span>
+                <span class="tab-label">Model Diagnostics</span>
+            </button>
+            <button class="tab-button" data-tab="preprocessing-tab">
+                <span class="tab-icon">📊</span>
+                <span class="tab-label">Preprocessing</span>
+            </button>
+            <button class="tab-button" data-tab="processing-tab">
+                <span class="tab-icon">🎨</span>
+                <span class="tab-label">Batch Processing</span>
+            </button>
+        </div>
+
+        <!-- Info Modal -->
+        <div id="info-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>ℹ️ About PyPotteryInk</h2>
+                    <button class="modal-close" id="close-info-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="about-centered">
+                        <img src="{{ url_for('static', filename='images/pypotteryink.png') }}" alt="PyPotteryInk Logo" class="about-logo">
+                        <h3>Lorenzo Cardarelli</h3>
+                        <p class="version">v{{ version }}</p>
+                        
+                        <div class="about-description">
+                            <p>You are using PyPotteryInk version {{ version }}, a Generative AI tool for translating archaeological pottery drawings into publication-ready illustrations.</p>
+                            
+                            <div class="disclosure-section">
+                                <h4>DISCLOSURE REQUIREMENT:</h4>
+                                <p>When publishing or presenting results that use PyPotteryInk, please include:</p>
+                                <ol>
+                                    <li>The version of PyPotteryInk used</li>
+                                    <li>The specific model used (e.g., '10k Model' or '6h-MCG Model')</li>
+                                    <li>The number of images processed</li>
+                                </ol>
+                                
+                                <h4>Suggested citation format:</h4>
+                                <div class="citation-box">
+"This research utilized PyPotteryInk (version {{ version }}) for the AI-assisted<br>
+translation of [number] pottery drawings. PyPotteryInk is a generative AI tool<br>
+developed by Lorenzo Cardarelli (https://github.com/lrncrd/PyPotteryInk)."
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="about-links">
+                            <a href="https://github.com/lrncrd/PyPotteryInk" target="_blank" class="btn btn-primary">GitHub Repository</a>
+                            <a href="https://huggingface.co/lrncrd/PyPotteryInk" target="_blank" class="btn btn-secondary">HuggingFace Models</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 1: Hardware Check -->
+        <div class="tab-content active" id="hardware-tab">
+            <div class="panel">
+                <h2>🖥️ System Requirements Check</h2>
+                <p class="info-text">This tool requires significant computational resources. Please verify your hardware meets the requirements.</p>
+                
+                <button id="check-hardware-btn" class="btn btn-primary">
+                    <span>🔍</span> Check Hardware
+                </button>
+                
+                <div id="hardware-report" class="report-container" style="display: none;"></div>
+                
+                <div class="info-box">
+                    <h3>Recommended Specifications:</h3>
+                    <ul>
+                        <li><strong>GPU:</strong> NVIDIA with at least 8GB VRAM (minimum 4GB)</li>
+                        <li><strong>CPU:</strong> 4+ modern cores (Intel i5/AMD Ryzen 5 or better)</li>
+                        <li><strong>RAM:</strong> 16GB (minimum 8GB)</li>
+                        <li><strong>Storage:</strong> Fast SSD (NVMe recommended)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Model Diagnostics -->
+        <div class="tab-content" id="diagnostics-tab">
+            <div class="panel">
+                <h2>🔍 Pre-Processing Analysis</h2>
+                <p class="info-text">Run preliminary tests to visualize patch processing and contrast comparisons before full processing.</p>
+                
+                <div class="form-group">
+                    <label for="diag-model-select">
+                        Select Model:
+                        <span class="info-tooltip" data-tooltip="Choose the AI model optimized for your pottery type. Each model is trained on different archaeological periods and styles.">ℹ️</span>
+                    </label>
+                    <select id="diag-model-select" class="form-control">
+                        {% for name, info in models.items() %}
+                        <option value="{{ name }}">{{ name }} ({{ info.size }}) - {{ info.description }}</option>
+                        {% endfor %}
+                        <option value="custom">📁 Custom Model (Local File)...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="diag-custom-model-upload" style="display: none;">
+                    <label for="diag-custom-model-file">
+                        Upload Custom Model (.pkl):
+                        <span class="info-tooltip" data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture.">ℹ️</span>
+                    </label>
+                    <input type="file" id="diag-custom-model-file" accept=".pkl" class="file-input">
+                    <small style="display: block; margin-top: 5px; color: #666;">
+                        Select a local .pkl model file
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        Upload Images:
+                        <span class="info-tooltip" data-tooltip="Upload pottery drawings to run diagnostic tests. The system will show you how different parameters affect the output.">ℹ️</span>
+                    </label>
+                    <div class="image-upload-area" id="diag-upload-area">
+                        <input type="file" id="diag-image-upload" multiple accept="image/*" class="file-input-hidden">
+                        <div class="upload-placeholder">
+                            <div class="upload-icon">📁</div>
+                            <p>Click to select images or drag & drop here</p>
+                            <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                        </div>
+                        <div class="upload-preview" id="diag-preview" style="display: none;"></div>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="diag-patch-size">
+                            Patch Size:
+                            <span class="info-tooltip" data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512">ℹ️</span>
+                        </label>
+                        <input type="number" id="diag-patch-size" value="512" min="256" max="1024" step="64" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="diag-overlap">
+                            Overlap:
+                            <span class="info-tooltip" data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64">ℹ️</span>
+                        </label>
+                        <input type="number" id="diag-overlap" value="64" min="0" max="256" step="16" class="form-control">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="diag-contrast">
+                        Contrast Test Values:
+                        <span class="info-tooltip" data-tooltip="Comma-separated contrast values to test. The model will generate outputs for each value so you can compare results. Example: 0.75, 1.0, 1.5, 2.0">ℹ️</span>
+                    </label>
+                    <input type="text" id="diag-contrast" value="0.75, 1.0, 1.5, 2.0" class="form-control">
+                    <small>Comma-separated values for contrast comparison</small>
+                </div>
+                
+                <button id="run-diagnostics-btn" class="btn btn-primary" disabled>
+                    <span>🚀</span> Run Diagnostics
+                </button>
+                
+                <div id="diagnostics-output" class="output-container" style="display: none;"></div>
+                <div id="diagnostics-gallery" class="gallery" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Preprocessing -->
+        <div class="tab-content" id="preprocessing-tab">
+            <div class="panel">
+                <h2>📊 Image Preprocessing</h2>
+                <p class="info-text">Calculate statistics from training images and apply preprocessing to optimize images for AI processing.</p>
+                
+                <h3>Step 1: Calculate Statistics (Optional)</h3>
+                <div class="form-group">
+                    <label>
+                        Upload Images for Statistics:
+                        <span class="info-tooltip" data-tooltip="Upload a representative sample of your training images. The system will analyze their properties (brightness, contrast, etc.) to create optimal preprocessing parameters.">ℹ️</span>
+                    </label>
+                    <div class="image-upload-area" id="stats-upload-area">
+                        <input type="file" id="stats-image-upload" multiple accept="image/*" class="file-input-hidden">
+                        <div class="upload-placeholder">
+                            <div class="upload-icon">📁</div>
+                            <p>Click to select images or drag & drop here</p>
+                            <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                        </div>
+                        <div class="upload-preview" id="stats-preview" style="display: none;"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="stats-save-path">
+                        Save Statistics As:
+                        <span class="info-tooltip" data-tooltip="Path where the calculated statistics will be saved as a .npy file. You can reuse this file later for preprocessing other images.">ℹ️</span>
+                    </label>
+                    <div class="input-with-button">
+                        <input type="text" id="stats-save-path" value="./custom_stats.npy" class="form-control">
+                        <button type="button" id="browse-stats-path" class="btn btn-secondary btn-small">📁 Browse...</button>
+                    </div>
+                </div>
+                
+                <button id="calculate-stats-btn" class="btn btn-secondary" disabled>
+                    <span>📊</span> Calculate Statistics
+                </button>
+                
+                <div id="stats-output" class="output-container" style="display: none;"></div>
+                
+                <h3>Step 2: Apply Preprocessing</h3>
+                <div class="form-group">
+                    <label>
+                        Upload Images to Preprocess:
+                        <span class="info-tooltip" data-tooltip="Upload the images you want to preprocess. The system will analyze each image and apply adjustments based on the statistics to optimize them for AI processing.">ℹ️</span>
+                    </label>
+                    <div class="image-upload-area" id="preprocess-upload-area">
+                        <input type="file" id="preprocess-image-upload" multiple accept="image/*" class="file-input-hidden">
+                        <div class="upload-placeholder">
+                            <div class="upload-icon">📁</div>
+                            <p>Click to select images or drag & drop here</p>
+                            <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                        </div>
+                        <div class="upload-preview" id="preprocess-preview" style="display: none;"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="use-calculated-stats">
+                        Use calculated statistics from Step 1
+                        <span class="info-tooltip" data-tooltip="If checked, uses the statistics you just calculated above. If unchecked, you can upload a previously saved .npy statistics file.">ℹ️</span>
+                    </label>
+                </div>
+                
+                <div class="form-group" id="stats-file-group" style="display: none;">
+                    <label for="stats-file-upload">
+                        Or Upload Statistics File (.npy):
+                        <span class="info-tooltip" data-tooltip="Upload a previously saved .npy statistics file. This allows you to reuse statistics calculated from other image sets.">ℹ️</span>
+                    </label>
+                    <input type="file" id="stats-file-upload" accept=".npy" class="file-input">
+                </div>
+                
+                <div class="form-group">
+                    <label for="preprocess-output-dir">
+                        Output Directory:
+                        <span class="info-tooltip" data-tooltip="Folder where the preprocessed images will be saved. Will be created if it doesn't exist.">ℹ️</span>
+                    </label>
+                    <div class="input-with-button">
+                        <input type="text" id="preprocess-output-dir" value="./preprocessed_images" class="form-control">
+                        <button type="button" id="browse-preprocess-dir" class="btn btn-secondary btn-small">📁 Browse...</button>
+                    </div>
+                </div>
+                
+                <button id="preprocess-btn" class="btn btn-primary" disabled>
+                    <span>✨</span> Apply Preprocessing
+                </button>
+                
+                <div id="preprocess-output" class="output-container" style="display: none;"></div>
+            </div>
+        </div>
+
+        <!-- Tab 4: Batch Processing -->
+        <div class="tab-content" id="processing-tab">
+            <div class="panel">
+                <h2>🎨 Batch Image Processing</h2>
+                <p class="info-text">Process multiple pottery drawings with AI enhancement.</p>
+                
+                <div class="form-group">
+                    <label for="process-model-select">
+                        Select Model:
+                        <span class="info-tooltip" data-tooltip="Choose the AI model best suited for your pottery type. Models are specialized for different archaeological periods: Bronze Age, Protohistoric, Historic, or general-purpose.">ℹ️</span>
+                    </label>
+                    <select id="process-model-select" class="form-control">
+                        {% for name, info in models.items() %}
+                        <option value="{{ name }}">{{ name }} ({{ info.size }}) - {{ info.description }}</option>
+                        {% endfor %}
+                        <option value="custom">📁 Custom Model (Local File)...</option>
+                    </select>
+                    <small class="model-status-text" id="model-status-text" style="display: block; margin-top: 5px; color: #666;">
+                        Model will be automatically downloaded if not present
+                    </small>
+                </div>
+                
+                <div class="form-group" id="custom-model-upload" style="display: none;">
+                    <label for="custom-model-file">
+                        Upload Custom Model (.pkl):
+                        <span class="info-tooltip" data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture.">ℹ️</span>
+                    </label>
+                    <input type="file" id="custom-model-file" accept=".pkl" class="file-input">
+                    <small style="display: block; margin-top: 5px; color: #666;">
+                        Select a local .pkl model file
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        Upload Images:
+                        <span class="info-tooltip" data-tooltip="Upload pottery drawings to enhance with AI. All images will be processed in batch. Supports PNG, JPG, and JPEG formats.">ℹ️</span>
+                    </label>
+                    <div class="image-upload-area" id="process-upload-area">
+                        <input type="file" id="process-image-upload" multiple accept="image/*" class="file-input-hidden">
+                        <div class="upload-placeholder">
+                            <div class="upload-icon">📁</div>
+                            <p>Click to select images or drag & drop here</p>
+                            <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                        </div>
+                        <div class="upload-preview" id="process-preview" style="display: none;"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="process-output-dir">
+                        Output Directory:
+                        <span class="info-tooltip" data-tooltip="Specify the folder where processed images will be saved. Can be an absolute path or relative to the application folder.">ℹ️</span>
+                    </label>
+                    <div class="input-with-button">
+                        <input type="text" id="process-output-dir" value="./enhanced_pottery" class="form-control" placeholder="Enter output folder path">
+                        <button type="button" id="browse-output-dir" class="btn btn-secondary btn-small">📁 Browse...</button>
+                    </div>
+                    <small style="display: block; margin-top: 5px; color: #666;">
+                        Specify where to save the processed images or click Browse to select a folder
+                    </small>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="process-patch-size">
+                            Patch Size:
+                            <span class="info-tooltip" data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512">ℹ️</span>
+                        </label>
+                        <input type="number" id="process-patch-size" value="512" min="256" max="1024" step="64" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="process-overlap">
+                            Overlap:
+                            <span class="info-tooltip" data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64">ℹ️</span>
+                        </label>
+                        <input type="number" id="process-overlap" value="64" min="0" max="256" step="16" class="form-control">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="process-contrast">
+                            Contrast Scale:
+                            <span class="info-tooltip" data-tooltip="Adjusts input image contrast before AI processing. >1 increases contrast, <1 decreases. Recommended: 1.0">ℹ️</span>
+                        </label>
+                        <input type="number" id="process-contrast" value="1.0" min="0.5" max="3.0" step="0.1" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="process-upscale">
+                            Upscale Factor:
+                            <span class="info-tooltip" data-tooltip="Scales images before processing. Higher = better quality but slower. Use 1 for original size. Recommended: 1-2">ℹ️</span>
+                        </label>
+                        <input type="number" id="process-upscale" value="1" min="1" max="4" step="1" class="form-control">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="use-fp16">
+                        Use FP16 (half precision - CUDA only)
+                        <span class="info-tooltip" data-tooltip="Uses 16-bit precision for faster processing on CUDA GPUs. Reduces VRAM usage but may affect quality slightly. Only works on NVIDIA GPUs.">ℹ️</span>
+                    </label>
+                </div>
+                
+                <button id="process-images-btn" class="btn btn-success btn-large" disabled>
+                    <span>🚀</span> Start Processing
+                </button>
+                
+                <div id="process-progress" class="progress-container" style="display: none;">
+                    <h4>Overall Progress:</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="process-progress-fill"></div>
+                    </div>
+                    <p id="process-status">Processing...</p>
+                    
+                    <h4 style="margin-top: 20px;">Current Image Patches:</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="patch-progress-fill"></div>
+                    </div>
+                    <p id="patch-status">Waiting...</p>
+                </div>
+                
+                <div id="process-output" class="output-container" style="display: none;"></div>
+                <div id="process-gallery" class="gallery" style="display: none;"></div>
+            </div>
+        </div>
+
+
+
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
