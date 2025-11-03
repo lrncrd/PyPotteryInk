@@ -10,6 +10,11 @@ from PIL import Image, ImageDraw
 import subprocess
 from typing import List, Tuple, Optional
 
+# Set matplotlib to use non-interactive backend for macOS compatibility
+import matplotlib
+matplotlib.use('Agg')  # Must be before importing pyplot
+import matplotlib.pyplot as plt
+
 
 def extract_pottery_elements(image_path: str, output_dir: str, min_area: int = 1000) -> List[str]:
     """
@@ -177,7 +182,6 @@ def create_enhanced_comparison(input_path: str, output_path: str,
             rows = 1
         
         # Create figure
-        import matplotlib.pyplot as plt
         fig = plt.figure(figsize=(cols * 5, rows * 5))
         
         # Add original and processed images

@@ -425,7 +425,7 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
                 contrast_scale: parseFloat(contrastScale),
                 patch_size: parseInt(patchSize),
                 overlap: parseInt(overlap),
-                upscale: parseInt(upscale)
+                upscale: parseFloat(upscale)
             })
         });
         

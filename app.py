@@ -556,31 +556,72 @@ def preprocess_images():
 def select_directory():
     """Open native directory picker dialog"""
     try:
-        from tkinter import Tk, filedialog
+        import platform
+        import subprocess
         
-        # Create a root window and hide it
-        root = Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
+        system = platform.system()
         
-        # Open directory picker
-        directory = filedialog.askdirectory(
-            title="Select Output Directory",
-            mustexist=False
-        )
-        
-        root.destroy()
-        
-        if directory:
-            return jsonify({
-                "success": True,
-                "directory": directory
-            })
+        if system == 'Darwin':  # macOS
+            # Use AppleScript for macOS - runs in separate process, avoiding threading issues
+            script = '''
+            tell application "System Events"
+                activate
+                set folderPath to choose folder with prompt "Select Output Directory" default location (path to home folder)
+                return POSIX path of folderPath
+            end tell
+            '''
+            try:
+                result = subprocess.run(
+                    ['osascript', '-e', script],
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                if result.returncode == 0:
+                    directory = result.stdout.strip()
+                    if directory:
+                        return jsonify({
+                            "success": True,
+                            "directory": directory
+                        })
+                else:
+                    return jsonify({
+                        "success": False,
+                        "error": "No directory selected"
+                    }), 400
+            except subprocess.TimeoutExpired:
+                return jsonify({
+                    "success": False,
+                    "error": "Dialog timeout"
+                }), 400
         else:
-            return jsonify({
-                "success": False,
-                "error": "No directory selected"
-            }), 400
+            # Use tkinter for other platforms (Windows, Linux)
+            from tkinter import Tk, filedialog
+            
+            # Create a root window and hide it
+            root = Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            
+            # Open directory picker
+            directory = filedialog.askdirectory(
+                title="Select Output Directory",
+                mustexist=False
+            )
+            
+            root.destroy()
+            
+            if directory:
+                return jsonify({
+                    "success": True,
+                    "directory": directory
+                })
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": "No directory selected"
+                }), 400
+                
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

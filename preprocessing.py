@@ -1,4 +1,7 @@
 import numpy as np
+# Set matplotlib to use non-interactive backend for macOS compatibility
+import matplotlib
+matplotlib.use('Agg')  # Must be before importing pyplot
 import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm

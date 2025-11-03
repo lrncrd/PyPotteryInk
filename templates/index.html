@@ -399,10 +399,10 @@ developed by Lorenzo Cardarelli (https://github.com/lrncrd/PyPotteryInk)."
                     </div>
                     <div class="form-group">
                         <label for="process-upscale">
-                            Upscale Factor:
-                            <span class="info-tooltip" data-tooltip="Scales images before processing. Higher = better quality but slower. Use 1 for original size. Recommended: 1-2">ℹ️</span>
+                            Scale Factor:
+                            <span class="info-tooltip" data-tooltip="Scales images before processing. Values > 1 upscale (better quality but slower), values < 1 downscale (faster). Use 1 for original size. Supports decimals (e.g., 0.5, 1.25, 1.75). Range: 0.25-4">ℹ️</span>
                         </label>
-                        <input type="number" id="process-upscale" value="1" min="1" max="4" step="1" class="form-control">
+                        <input type="number" id="process-upscale" value="1" min="0.25" max="4" step="0.25" class="form-control">
                     </div>
                 </div>
                 

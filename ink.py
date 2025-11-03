@@ -11,6 +11,10 @@ import torch
 from torchvision import transforms
 import torchvision.transforms.functional as F
 from tqdm import tqdm
+
+# Set matplotlib to use non-interactive backend for macOS compatibility
+import matplotlib
+matplotlib.use('Agg')  # Must be before importing pyplot
 import matplotlib.pyplot as plt
 
 # Local imports (keep unchanged for compatibility with your app)
@@ -314,7 +318,7 @@ def process_single_image(
     return_pil: bool = False,
     patch_size: int = 512,
     overlap: int = 64,
-    upscale: int = 1,
+    upscale: float = 1,
 ):
     """Process a single image with improved patch strategy and device support.
 
@@ -341,7 +345,9 @@ def process_single_image(
 
     # Upscale/downscale logic preserved
     if upscale >= 1:
-        input_image = input_image.resize((input_image.width * upscale, input_image.height * upscale), Image.LANCZOS)
+        new_width = round(input_image.width * upscale)
+        new_height = round(input_image.height * upscale)
+        input_image = input_image.resize((new_width, new_height), Image.LANCZOS)
         print(f"  - Upscaled size: {input_image.size}")
     else:
         new_width = max(1, round(input_image.width * upscale))
@@ -436,7 +442,7 @@ def process_folder(
     patch_size: int = 512,
     overlap: int = 64,
     file_extensions: Tuple[str, ...] = ('.jpg', '.jpeg', '.png', '.tif', '.tiff'),
-    upscale: int = 1,
+    upscale: float = 1,
     progress_callback=None,
     export_elements: bool = True,
     export_svg: bool = True,
@@ -514,7 +520,9 @@ def process_folder(
 
                 # Upscale / downscale
                 if upscale >= 1:
-                    input_image = input_image.resize((input_image.width * upscale, input_image.height * upscale), Image.LANCZOS)
+                    new_width = round(input_image.width * upscale)
+                    new_height = round(input_image.height * upscale)
+                    input_image = input_image.resize((new_width, new_height), Image.LANCZOS)
                     print(f"  - Upscaled size: {input_image.size}")
                 else:
                     new_width = max(1, round(input_image.width * upscale))
