@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="imgs/pypotteryink.png" width="250"/>
+<img src="imgs/LogoInk.png" width="250"/>
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![Documentation](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://lrncrd.github.io/PyPotteryInk/)

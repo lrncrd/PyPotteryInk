@@ -1,6 +1,6 @@
 @echo off
 echo ====================================
-echo  PyPotteryInk Flask Application
+echo  PyPotteryInk Application
 echo ====================================
 echo.
 
@@ -52,14 +52,14 @@ echo ====================================
 echo  Starting Flask Server
 echo ====================================
 echo.
-echo Open your browser at: http://127.0.0.1:5001
+echo Open your browser at: http://127.0.0.1:5003
 echo.
 echo Press Ctrl+C to stop the server
 echo.
 echo ====================================
 echo.
 
-python flask_app.py
+python app.py
 
 deactivate
 pause
