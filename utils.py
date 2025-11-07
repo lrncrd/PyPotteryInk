@@ -138,7 +138,7 @@ def print_disclosure_reminder():
     Prints the AI disclosure reminder when PyPotteryInk is run.
     This function should be called at the beginning of the main execution.
     """
-    version = "0.0.3"  # Replace with version variable from your package
+    version = "2.0.0"  # Replace with version variable from your package
     
     print("\n" + "=" * 80)
     print(" 📢 PYPOTTERYINK AI DISCLOSURE REMINDER ".center(80, "="))

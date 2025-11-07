@@ -4,10 +4,10 @@
 
 <img src="imgs/LogoInk.png" width="250"/>
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![Documentation](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![HuggingFace](https://img.shields.io/badge/🤗%20Models-PyPotteryInk-yellow.svg)](https://huggingface.co/lrncrd/PyPotteryInk)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.culher.2025.06.016-blue.svg)](https://doi.org/10.1016/j.culher.2025.06.016)
 [![GPU Support](https://img.shields.io/badge/GPU-CUDA%20%7C%20MPS-green.svg)](https://github.com/lrncrd/PyPotteryInk)
 
@@ -36,11 +36,10 @@ As part of the **PyPottery** toolkit, `PyPotteryInk` is a deep learning applicat
 - 🎨 **Stippling Control**: Fine-grained control over dot patterns and shading
 - 📂 **Batch Processing**: Efficient handling of multiple drawings
 - 🖥️ **Multi-GPU Support**: Now supports CUDA (NVIDIA), MPS (Apple Silicon M1/M2/M3), and CPU fallback
-- 🌐 **Web Interface**: User-friendly Gradio interface for easy access
+- 🌐 **Web Interface**: User-friendly Flask-based web interface for easy access
 - 📊 **Preprocessing Tools**: Built-in image analysis and optimization with detailed statistics visualization
 - 🔧 **Easy Installation**: One-click installation scripts for all major operating systems
-- 📦 **Element Extraction**: Automatically extract individual pottery elements as separate high-resolution images
-- 🎨 **SVG Export**: Convert outputs to scalable vector graphics for publication flexibility
+- 🎯 **Custom Models**: Support for uploading and using custom-trained models
 
 ## 🚀 Quick Start
 
@@ -63,29 +62,28 @@ The installation script will:
 ### Running the Application
 
 After installation:
-- **Windows**: Double-click `run.bat` or run it from terminal
-- **macOS/Linux**: Run `./run.sh` or `python app.py`
+- **Windows**: Double-click `PyPotteryInk_WIN.bat` or run `python app.py` from terminal
+- **macOS/Linux**: Run `./PyPotteryInk_UNIX.sh` or `python app.py`
 
-The web interface will open automatically in your browser at `http://127.0.0.1:7860` (or the next available port).
+The web interface will open automatically in your browser at `http://127.0.0.1:5003`.
 
 ### Web Interface
 
-Version 1.0.0 introduces a user-friendly web interface powered by Gradio.
+Version 2.0.0 introduces a modern Flask-based web interface with real-time processing updates.
 
 <div align="center">
 <img src="imgs/gui_example.png" width="800"/>
 </div>
 
 1. **Hardware Check Tab**: Verify your system meets requirements
-2. **Model Diagnostics Tab**: Test different settings before processing
-3. **Preprocessing Tab**: 
+2. **Model Management**: Download and manage AI models
+3. **Model Diagnostics Tab**: Test different settings before processing
+4. **Preprocessing Tab**: 
    - Calculate detailed statistics from your dataset
    - View distribution plots and summary tables
    - Apply optimizations based on statistical analysis
-4. **Batch Processing Tab**: Process multiple images with real-time progress
-   - **Advanced Export Options**:
-     - Extract individual pottery elements as separate high-resolution images
-     - Export to SVG format for scalable vector graphics
+5. **Batch Processing Tab**: Process multiple images with real-time progress tracking
+6. **Custom Model Upload**: Upload and use your own fine-tuned models
 
 ## 📚 Documentation
 
@@ -103,6 +101,7 @@ Version 1.0.0 introduces a user-friendly web interface powered by Gradio.
 | **6h-MCG Model** | High-quality model for Bronze Age drawings | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MCG.pkl?download=true) |
 | **6h-MC Model** | High-quality model for Protohistoric and Historic drawings | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MC.pkl?download=true) |
 | **4h-PAINT Model** | Tailored model for Historic and painted pottery | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/4h-PAINT.pkl?download=true) |
+| **5h-PAPERGRID Model** | Tailored model for handling paper grid tables (does not support shadows) | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/5h_PAPERGRID.pkl?download=true) |
 
 
 
@@ -137,20 +136,14 @@ All models support custom fine-tuning for specific archaeological contexts or st
 - **MPS (Apple Silicon)**: Full support with FP32 (automatic)
 - **CPU**: Fallback mode (significantly slower)
 
-### Optional Dependencies for Advanced Features
 
-#### SVG Export (requires potrace)
-To enable SVG export functionality, install potrace:
-- **macOS**: `brew install potrace`
-- **Linux**: `sudo apt-get install potrace`
-- **Windows**: Download from [potrace.sourceforge.net](http://potrace.sourceforge.net/#downloading)
 
 ## 📢 AI Disclosure and Citation
 
 PyPotteryInk uses Generative AI to translate archaeological pottery drawings into publication-ready illustrations. To promote transparency about the use of Generative AI and proper attribution in scientific research, is required all users to include the following disclosure statement in any publication, presentation, or report that utilizes PyPotteryInk:
 
 ```
-This research utilized PyPotteryInk (version 1.0) for the AI-assisted translation of [number] pottery drawings. PyPotteryInk is a generative AI tool developed by Lorenzo Cardarelli (https://github.com/lrncrd/PyPotteryInk).
+This research utilized PyPotteryInk (version 2.0) for the AI-assisted translation of [number] pottery drawings. PyPotteryInk is a generative AI tool developed by Lorenzo Cardarelli (https://github.com/lrncrd/PyPotteryInk).
 ```
 
 Where you need to specify the software version and the number of processed pottery drawings.
@@ -173,7 +166,7 @@ If you use PyPotteryInk in your research, please cite:
   title = {PyPotteryInk: Transform archaeological pottery drawings into publication-ready illustrations with AI},
   year = {2025},
   url = {https://github.com/lrncrd/PyPotteryInk},
-  version = {1.0}
+  version = {2.0}
 }
 ```
 
@@ -210,27 +203,17 @@ Based on img2img-turbo by [GaParmar](https://github.com/GaParmar/img2img-turbo)
 
 The original code was released under the MIT Licence. The changes made in this fork are released under the Apache License 2.0.
 
-## 🆕 What's New in Version 1.0
+## 🆕 What's New in Version 2.0.0
 
-- **Multi-GPU Support**: Added support for Apple Silicon (M1/M2/M3) GPUs via Metal Performance Shaders
-- **Gradio Web Interface**: New user-friendly web interface with multiple tabs:
-  - Hardware Check: Verify system compatibility
-  - Model Diagnostics: Preview processing with different settings
-  - Preprocessing: Analyze and optimize images before processing
-  - Batch Processing: Process multiple images with progress tracking
-- **Automated Installation**: One-click installation scripts for all platforms
-- **Improved Compatibility**: Fixed compatibility issues with various diffusers/PEFT versions
-- **Real-time Progress**: See processing progress directly in the web interface
-- **Enhanced Error Handling**: Better error messages and recovery options
-- **Statistics Visualization**: New detailed statistics analysis with:
-  - Summary tables showing all key metrics
-  - Interactive distribution plots
-  - Histogram and KDE visualizations
-  - Box plots for metric overview
-- **Smart Port Management**: Automatic port selection if default port is busy
-- **Advanced Export Options**:
-  - Element extraction: Automatically identify and extract individual pottery elements
-  - SVG export: Convert processed images to scalable vector graphics for publication
+- **Flask Web Interface**: Complete redesign with Flask for better performance and reliability
+- **Real-time Progress Updates**: Server-Sent Events (SSE) for live processing status
+- **Custom Model Support**: Upload and use your own fine-tuned models
+- **5h-PAPERGRID Model**: New specialized model for handling paper grid tables
+- **Improved Session Management**: Better handling of multiple processing sessions
+- **Better Error Handling**: More informative error messages and recovery options
+- **Streamlined Interface**: Cleaner, more intuitive user experience
+- **Directory Picker**: Native file system dialogs for selecting output directories
+- **Comparison Images**: Automatic generation of before/after comparisons
 
 ## 🛠️ Development Setup
 
@@ -259,20 +242,19 @@ pip install -r requirements.txt
    - Models are downloaded from Hugging Face (may be blocked in some regions)
    - Manual download links are available in the table above
 
-3. **Port already in use error**
-   - The app now automatically finds an available port
-   - If you see this error with older versions, close other Gradio instances
-   - Or manually specify a port: `GRADIO_SERVER_PORT=7861 python app.py`
+3. **Flask server not starting**
+   - Check if port 5003 is already in use
+   - Try closing other applications that might use this port
+   - Alternatively, modify the port in `app.py` (last line)
 
 4. **Statistics visualization not showing**
    - Ensure scipy is installed: `pip install scipy`
    - Check that you have at least 2 images for meaningful statistics
    - Verify the "Generate visualization plots" checkbox is enabled
 
-5. **SVG export not working**
-   - Install potrace (see Optional Dependencies section above)
-   - Ensure potrace is in your system PATH
-   - Check that the "Export SVG Versions" checkbox is enabled
-   - Note: SVG export works best with high-contrast binary images
+5. **Custom model not working**
+   - Ensure the model file is in `.pkl` format
+   - Check that the model is compatible with the PyPotteryInk architecture
+   - Verify the file was uploaded successfully before processing
 
 ---
