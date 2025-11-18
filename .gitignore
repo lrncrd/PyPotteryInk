@@ -193,3 +193,6 @@ docs
 /test_progress.py
 
 .vscode/
+
+release/
+enhanced_pottery/

@@ -166,6 +166,16 @@ body {
     margin-top: 5px;
 }
 
+.version-badge {
+    font-size: 0.7rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
 .header-subtitle {
     color: var(--text-secondary);
     font-size: 1.1em;
