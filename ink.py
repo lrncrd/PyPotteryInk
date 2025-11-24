@@ -343,6 +343,18 @@ def process_single_image(
     else:
         input_image = input_image_path_or_pil.convert('RGB')
 
+    if input_image.width < patch_size or input_image.height < patch_size:
+        new_width = max(input_image.width, patch_size)
+        new_height = max(input_image.height, patch_size)
+        padded_image = Image.new('RGB', (new_width, new_height), (255, 255, 255))
+        padded_image.paste(input_image, (0, 0))
+        input_image = padded_image
+        print(f"  - Image padded to: {input_image.size}")
+
+        ############ end padding #############################
+    
+    
+
     # Upscale/downscale logic preserved
     if upscale >= 1:
         new_width = round(input_image.width * upscale)
@@ -514,6 +526,20 @@ def process_folder(
 
             try:
                 input_image = Image.open(input_path).convert('RGB')
+
+                ### pad image if needed ##############################
+                if input_image.width < patch_size or input_image.height < patch_size:
+                    new_width = max(input_image.width, patch_size)
+                    new_height = max(input_image.height, patch_size)
+                    padded_image = Image.new('RGB', (new_width, new_height), (255, 255, 255))
+                    padded_image.paste(input_image, (0, 0))
+                    input_image = padded_image
+                    print(f"  - Image padded to: {input_image.size}")
+
+                ############ end padding ##############################
+
+
+
                 original_size = (input_image.width, input_image.height)
                 print(f"  - Original size: {original_size}")
                 log.write(f"Original size: {original_size}\n")
