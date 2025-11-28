@@ -260,6 +260,35 @@ def upload_custom_model():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+@app.route('/api/upload-stats', methods=['POST'])
+def upload_stats():
+    """Handle upload of a .npy statistics file and return its server path"""
+    try:
+        if 'stats_file' not in request.files:
+            return jsonify({"success": False, "error": "No statistics file provided"}), 400
+
+        stats_file = request.files['stats_file']
+        if stats_file.filename == '':
+            return jsonify({"success": False, "error": "No file selected"}), 400
+
+        if not stats_file.filename.lower().endswith('.npy'):
+            return jsonify({"success": False, "error": "Only .npy files are supported"}), 400
+
+        filename = secure_filename(stats_file.filename)
+        stats_dir = os.path.join(app.config.get('UPLOAD_FOLDER', 'temp_uploads'), 'stats')
+        os.makedirs(stats_dir, exist_ok=True)
+        stats_path = os.path.join(stats_dir, filename)
+        stats_file.save(stats_path)
+
+        return jsonify({
+            "success": True,
+            "stats_path": stats_path,
+            "message": f"Statistics file '{filename}' uploaded successfully"
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/api/process-images', methods=['POST'])
 def process_images():
     """Process uploaded images with the selected model"""
@@ -293,9 +322,16 @@ def process_images():
             model_info = MODELS[model_name]
             model_path = os.path.join(MODELS_DIR, model_info["filename"])
             prompt = model_info["prompt"]
-            
+
+            # If the model is not present, attempt to download it (same behavior as batch processing)
             if not os.path.exists(model_path):
-                return jsonify({"success": False, "error": "Model not downloaded"}), 400
+                downloaded_path, downloaded_prompt = download_model(model_name)
+                if not downloaded_path:
+                    return jsonify({"success": False, "error": "Model not downloaded and download failed"}), 500
+                model_path = downloaded_path
+                # prefer any prompt returned by download_model
+                if downloaded_prompt:
+                    prompt = downloaded_prompt
         
         # Create a unique session ID for this processing job
         session_id = str(int(time.time() * 1000))
@@ -409,9 +445,23 @@ def get_progress(session_id):
 def run_diagnostics():
     """Run diagnostics on uploaded images"""
     try:
-        data = request.json
+        # Accept JSON or form-encoded data; be resilient if Content-Type is missing
+        data = request.get_json(silent=True)
+        if data is None:
+            # Fallback to form data (e.g., if client used FormData accidentally)
+            if request.form:
+                data = request.form.to_dict()
+            elif request.data:
+                try:
+                    data = json.loads(request.data.decode('utf-8'))
+                except Exception:
+                    data = None
+
         if not data:
+            print('Diagnostics called with empty/invalid payload. Headers:', dict(request.headers))
             return jsonify({"success": False, "error": "Invalid request data"}), 400
+
+        print(f"Diagnostics payload: {data}")
         
         model_name = data.get('model_name')
         patch_size = data.get('patch_size', 512)
@@ -432,38 +482,88 @@ def run_diagnostics():
             model_info = MODELS[model_name]
             model_path = os.path.join(MODELS_DIR, model_info["filename"])
             prompt = model_info["prompt"]
-            
+
+            # If the model is not present, attempt to download it (behaviour like batch processing)
             if not os.path.exists(model_path):
-                return jsonify({"success": False, "error": "Model not downloaded"}), 400
+                print(f"Model '{model_name}' not found at {model_path}. Attempting to download...")
+                downloaded_path, downloaded_prompt = download_model(model_name)
+                if not downloaded_path:
+                    print(f"Failed to download model: {model_name}")
+                    return jsonify({"success": False, "error": "Model not downloaded and download failed"}), 500
+                model_path = downloaded_path
+                if downloaded_prompt:
+                    prompt = downloaded_prompt
         
-        # Import diagnostics function
-        from ink import run_diagnostics
-        
+        # Run diagnostics in a background thread and report progress via progress_queues
+        from ink import run_diagnostics as ink_run_diagnostics
+
         diagnostics_dir = 'temp_diagnostics'
         os.makedirs(diagnostics_dir, exist_ok=True)
-        
-        success = run_diagnostics(
-            input_folder=app.config['UPLOAD_FOLDER'],
-            model_path=model_path,
-            prompt=prompt,
-            patch_size=patch_size,
-            overlap=overlap,
-            contrast_values=contrast_values,
-            output_dir=diagnostics_dir
-        )
-        
-        if success:
-            diagnostic_files = []
-            for file in os.listdir(diagnostics_dir):
-                if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    diagnostic_files.append(file)
-            
-            return jsonify({
-                "success": True,
-                "diagnostic_files": diagnostic_files
-            })
-        else:
-            return jsonify({"success": False, "error": "Diagnostics failed"}), 500
+
+        # Create session for progress reporting
+        session_id = str(int(time.time() * 1000))
+        progress_queues[session_id] = Queue()
+
+        def diagnostics_background():
+            try:
+                # Notify start
+                progress_queues[session_id].put({
+                    'progress': 5,
+                    'message': 'Starting diagnostics...',
+                })
+
+                # Define a progress callback that pushes updates to the queue
+                def progress_cb(update):
+                    try:
+                        # Ensure keys we send are serializable
+                        progress_queues[session_id].put(update)
+                    except Exception:
+                        pass
+
+                # Run the diagnostics (this may take time) and pass the callback
+                success = ink_run_diagnostics(
+                    input_folder=app.config['UPLOAD_FOLDER'],
+                    model_path=model_path,
+                    prompt=prompt,
+                    patch_size=patch_size,
+                    overlap=overlap,
+                    contrast_values=contrast_values,
+                    output_dir=diagnostics_dir,
+                    progress_callback=progress_cb
+                )
+
+                if success:
+                    diagnostic_files = []
+                    for file in os.listdir(diagnostics_dir):
+                        if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                            diagnostic_files.append(file)
+
+                    progress_queues[session_id].put({
+                        'progress': 100,
+                        'message': 'Diagnostics completed!',
+                        'completed': True,
+                        'results': {'diagnostic_files': diagnostic_files}
+                    })
+                else:
+                    progress_queues[session_id].put({
+                        'progress': 0,
+                        'message': 'Diagnostics failed',
+                        'error': True
+                    })
+            except Exception as e:
+                progress_queues[session_id].put({
+                    'progress': 0,
+                    'message': f'Diagnostics error: {str(e)}',
+                    'error': True
+                })
+
+        thread = threading.Thread(target=diagnostics_background)
+        thread.daemon = True
+        thread.start()
+
+        print(f"Diagnostics started. session_id={session_id}")
+
+        return jsonify({"success": True, "session_id": session_id, "message": "Diagnostics started"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -501,16 +601,16 @@ def calculate_statistics():
 def preprocess_images():
     """Apply preprocessing adjustments to images"""
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
         calculate_stats = data.get('calculate_stats', False)
         stats_file = data.get('stats_file', None)
         output_dir = data.get('output_dir', './preprocessed_images')
-        
+
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Determine which statistics to use
         model_stats = None
-        
+
         if calculate_stats:
             analyzer = DatasetAnalyzer()
             model_stats = analyzer.analyze_dataset(app.config['UPLOAD_FOLDER'])
@@ -519,36 +619,77 @@ def preprocess_images():
             model_stats = analyzer.distributions
         else:
             return jsonify({"success": False, "error": "No statistics provided"}), 400
-        
-        # Process each image
-        processed_count = 0
-        adjusted_count = 0
-        
-        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-            if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff')):
-                image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                image = Image.open(image_path).convert('RGB')
-                
-                # Check if adjustments are needed
-                quality_check = check_image_quality(image, model_stats)
-                
-                if quality_check['recommendations']:
-                    adjusted_image = apply_recommended_adjustments(image, model_stats, verbose=False)
-                    adjusted_count += 1
-                else:
-                    adjusted_image = image
-                
-                # Save processed image
-                output_path = os.path.join(output_dir, filename)
-                adjusted_image.save(output_path)
-                processed_count += 1
-        
-        return jsonify({
-            "success": True,
-            "processed": processed_count,
-            "adjusted": adjusted_count,
-            "output_dir": output_dir
-        })
+
+        # Prepare background processing with progress reporting
+        session_id = str(int(time.time() * 1000))
+        progress_queues[session_id] = Queue()
+
+        def preprocess_in_background():
+            try:
+                files = [f for f in os.listdir(app.config['UPLOAD_FOLDER']) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
+                total = len(files)
+                processed_count = 0
+                adjusted_count = 0
+
+                if total == 0:
+                    progress_queues[session_id].put({
+                        'progress': 100,
+                        'message': 'No images to preprocess',
+                        'completed': True,
+                        'results': {'processed': 0, 'adjusted': 0, 'output_dir': output_dir}
+                    })
+                    return
+
+                for idx, filename in enumerate(files, start=1):
+                    image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    try:
+                        image = Image.open(image_path).convert('RGB')
+                        quality_check = check_image_quality(image, model_stats)
+
+                        if quality_check['recommendations']:
+                            adjusted_image = apply_recommended_adjustments(image, model_stats, verbose=False)
+                            adjusted_count += 1
+                        else:
+                            adjusted_image = image
+
+                        output_path = os.path.join(output_dir, filename)
+                        adjusted_image.save(output_path)
+                        processed_count += 1
+
+                        progress = int(processed_count / total * 100)
+                        progress_queues[session_id].put({
+                            'progress': progress,
+                            'message': f'Processed {processed_count}/{total} images',
+                            'processed': processed_count,
+                            'adjusted': adjusted_count
+                        })
+                    except Exception as e:
+                        # send a partial error message but continue
+                        progress_queues[session_id].put({
+                            'progress': int(processed_count / max(1, total) * 100),
+                            'message': f'Error processing {filename}: {str(e)}'
+                        })
+
+                # Finalize
+                progress_queues[session_id].put({
+                    'progress': 100,
+                    'message': 'Preprocessing completed',
+                    'completed': True,
+                    'results': {'processed': processed_count, 'adjusted': adjusted_count, 'output_dir': output_dir}
+                })
+            except Exception as e:
+                progress_queues[session_id].put({
+                    'progress': 0,
+                    'message': f'Error during preprocessing: {str(e)}',
+                    'error': True
+                })
+
+        thread = threading.Thread(target=preprocess_in_background)
+        thread.daemon = True
+        thread.start()
+        print(f"Preprocessing started. session_id={session_id}, output_dir={output_dir}")
+
+        return jsonify({"success": True, "session_id": session_id, "message": "Preprocessing started"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

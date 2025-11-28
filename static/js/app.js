@@ -166,7 +166,7 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
             }
         }
 
-        // Run diagnostics
+        // Start diagnostics (server will run in background and return a session_id)
         const diagResponse = await fetch('/api/diagnostics', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -178,23 +178,89 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
             })
         });
 
-        const data = await diagResponse.json();
+        if (!diagResponse.ok) throw new Error('Failed to start diagnostics');
 
-        if (data.success) {
-            showMessage('success', `Diagnostics completed! Generated ${data.diagnostic_files.length} visualizations.`, outputContainer);
+        const resp = await diagResponse.json();
+        console.log('Diagnostics start response:', resp);
 
-            // Display images
+        // Backwards-compatible: if server returned results directly
+        if (resp.success && resp.diagnostic_files) {
+            showMessage('success', `Diagnostics completed! Generated ${resp.diagnostic_files.length} visualizations.`, outputContainer);
             gallery.innerHTML = '';
-            data.diagnostic_files.forEach(file => {
+            resp.diagnostic_files.forEach(file => {
                 const img = document.createElement('img');
                 img.src = `/api/get-image/diagnostics/${file}`;
                 img.alt = file;
                 gallery.appendChild(img);
             });
             gallery.style.display = 'grid';
-        } else {
-            showMessage('error', 'Diagnostics failed: ' + data.error, outputContainer);
+            btn.disabled = false;
+            btn.innerHTML = '<span>🚀</span> Run Diagnostics';
+            return;
         }
+
+        if (!resp.success || !resp.session_id) {
+            throw new Error(resp.error || 'Failed to start diagnostics');
+        }
+
+        const sessionId = resp.session_id;
+        const progressContainer = document.getElementById('diag-progress');
+        const progressFill = document.getElementById('diag-progress-fill');
+        const statusText = document.getElementById('diag-status');
+
+        progressContainer.style.display = 'block';
+        progressFill.style.width = '5%';
+        statusText.textContent = 'Starting diagnostics...';
+
+        const eventSource = new EventSource(`/api/progress/${sessionId}`);
+
+        eventSource.onmessage = function (event) {
+            const data = JSON.parse(event.data);
+            if (data.keepalive) return;
+
+            if (data.error) {
+                showMessage('error', data.message || 'Diagnostics error', outputContainer);
+                eventSource.close();
+                btn.disabled = false;
+                btn.innerHTML = '<span>🚀</span> Run Diagnostics';
+                return;
+            }
+
+            if (data.progress !== undefined) {
+                const progress = Math.min(Math.max(data.progress, 0), 100);
+                progressFill.style.width = progress + '%';
+                statusText.textContent = data.message || 'Running diagnostics...';
+            }
+
+            if (data.completed && data.results) {
+                eventSource.close();
+
+                const files = data.results.diagnostic_files || [];
+                showMessage('success', `Diagnostics completed! Generated ${files.length} visualizations.`, outputContainer);
+
+                gallery.innerHTML = '';
+                files.forEach(file => {
+                    const img = document.createElement('img');
+                    img.src = `/api/get-image/diagnostics/${file}`;
+                    img.alt = file;
+                    gallery.appendChild(img);
+                });
+                gallery.style.display = 'grid';
+
+                btn.disabled = false;
+                btn.innerHTML = '<span>🚀</span> Run Diagnostics';
+                progressFill.style.width = '100%';
+                statusText.textContent = 'Completed';
+            }
+        };
+
+        eventSource.onerror = function () {
+            eventSource.close();
+            showMessage('error', 'Connection lost. Diagnostics may still continue in background.', outputContainer);
+            btn.disabled = false;
+            btn.innerHTML = '<span>🚀</span> Run Diagnostics';
+            progressContainer.style.display = 'none';
+        };
     } catch (error) {
         showMessage('error', 'Error: ' + error.message, outputContainer);
     } finally {
@@ -319,7 +385,8 @@ document.getElementById('preprocess-btn').addEventListener('click', async functi
             statsFilePath = statsData.stats_path;
         }
 
-        // Preprocess images
+        console.log('Starting preprocess flow: uploading images and requesting preprocessing');
+        // Start preprocessing (server runs it in background and returns a session_id)
         const preprocessResponse = await fetch('/api/preprocess-images', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -330,21 +397,93 @@ document.getElementById('preprocess-btn').addEventListener('click', async functi
             })
         });
 
-        const data = await preprocessResponse.json();
+        if (!preprocessResponse.ok) throw new Error('Failed to start preprocessing');
 
-        if (data.success) {
+        const respData = await preprocessResponse.json();
+        console.log('Preprocess start response:', respData);
+
+        // Backwards-compatible: if server returned final results directly, show them
+        if (respData.success && respData.processed !== undefined) {
+            console.log('Server returned direct results (no SSE).');
             const html = `
                 <div class="message message-success">✅ Preprocessing completed!</div>
-                <p><strong>Total processed:</strong> ${data.processed}</p>
-                <p><strong>Images adjusted:</strong> ${data.adjusted}</p>
-                <p><strong>No adjustments needed:</strong> ${data.processed - data.adjusted}</p>
-                <p><strong>Output directory:</strong> ${data.output_dir}</p>
+                <p><strong>Total processed:</strong> ${respData.processed}</p>
+                <p><strong>Images adjusted:</strong> ${respData.adjusted}</p>
+                <p><strong>No adjustments needed:</strong> ${respData.processed - respData.adjusted}</p>
+                <p><strong>Output directory:</strong> ${respData.output_dir}</p>
             `;
             outputContainer.innerHTML = html;
             outputContainer.style.display = 'block';
-        } else {
-            showMessage('error', 'Preprocessing failed: ' + data.error, outputContainer);
+            btn.disabled = false;
+            btn.innerHTML = '<span>✨</span> Apply Preprocessing';
+            return;
         }
+
+        if (!respData.success || !respData.session_id) {
+            throw new Error(respData.error || 'Failed to start preprocessing');
+        }
+
+        // Show progress UI and listen for SSE
+        const sessionId = respData.session_id;
+        const progressContainer = document.getElementById('preprocess-progress');
+        const progressFill = document.getElementById('preprocess-progress-fill');
+        const statusText = document.getElementById('preprocess-status');
+
+        progressContainer.style.display = 'block';
+        progressFill.style.width = '5%';
+        statusText.textContent = 'Starting preprocessing...';
+
+        const eventSource = new EventSource(`/api/progress/${sessionId}`);
+
+        eventSource.onmessage = function (event) {
+            const data = JSON.parse(event.data);
+
+            if (data.keepalive) return;
+
+            if (data.error) {
+                showMessage('error', data.message || 'Preprocessing error', outputContainer);
+                eventSource.close();
+                btn.disabled = false;
+                btn.innerHTML = '<span>✨</span> Apply Preprocessing';
+                return;
+            }
+
+            if (data.progress !== undefined) {
+                const progress = Math.min(Math.max(data.progress, 0), 100);
+                progressFill.style.width = progress + '%';
+                statusText.textContent = data.message || 'Processing...';
+            }
+
+            if (data.completed && data.results) {
+                eventSource.close();
+
+                const results = data.results;
+                const html = `
+                    <div class="message message-success">✅ Preprocessing completed!</div>
+                    <p><strong>Total processed:</strong> ${results.processed}</p>
+                    <p><strong>Images adjusted:</strong> ${results.adjusted}</p>
+                    <p><strong>No adjustments needed:</strong> ${results.processed - results.adjusted}</p>
+                    <p><strong>Output directory:</strong> ${results.output_dir}</p>
+                `;
+
+                outputContainer.innerHTML = html;
+                outputContainer.style.display = 'block';
+
+                // Reset button
+                btn.disabled = false;
+                btn.innerHTML = '<span>✨</span> Apply Preprocessing';
+                progressFill.style.width = '100%';
+                statusText.textContent = 'Completed';
+            }
+        };
+
+        eventSource.onerror = function () {
+            eventSource.close();
+            showMessage('error', 'Connection lost. Preprocessing may still continue in background.', outputContainer);
+            btn.disabled = false;
+            btn.innerHTML = '<span>✨</span> Apply Preprocessing';
+            progressContainer.style.display = 'none';
+        };
     } catch (error) {
         showMessage('error', 'Error: ' + error.message, outputContainer);
     } finally {

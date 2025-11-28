@@ -244,6 +244,14 @@
                     <span>✨</span> Apply Preprocessing
                 </button>
 
+                <div id="preprocess-progress" class="progress-container" style="display: none; margin-top: 16px;">
+                    <h4>Overall Progress:</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="preprocess-progress-fill"></div>
+                    </div>
+                    <p id="preprocess-status">Processing...</p>
+                </div>
+
                 <div id="preprocess-output" class="output-container" style="display: none;"></div>
             </div>
         </div>
@@ -332,6 +340,14 @@
                 <button id="run-diagnostics-btn" class="btn btn-primary" disabled>
                     <span>🚀</span> Run Diagnostics
                 </button>
+
+                <div id="diag-progress" class="progress-container" style="display: none; margin-top: 16px;">
+                    <h4>Overall Progress:</h4>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="diag-progress-fill"></div>
+                    </div>
+                    <p id="diag-status">Processing...</p>
+                </div>
 
                 <div id="diagnostics-output" class="output-container" style="display: none;"></div>
                 <div id="diagnostics-gallery" class="gallery" style="display: none;"></div>

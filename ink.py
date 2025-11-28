@@ -207,6 +207,7 @@ def run_diagnostics(
     num_sample_images: int = 5,
     contrast_values: List[float] = [0.5, 0.75, 1, 1.5, 2, 3],
     output_dir: str = 'diagnostics',
+    progress_callback=None,
 ):
     """Run diagnostic visualisations before main processing.
 
@@ -233,6 +234,15 @@ def run_diagnostics(
 
     # Load model once (cached)
     model = _load_model_cached(model_path, device, use_fp16_default)
+
+    total_steps = num_samples * max(1, len(contrast_values))
+    completed_steps = 0
+
+    if progress_callback:
+        try:
+            progress_callback({'progress': 5, 'message': 'Starting diagnostics'})
+        except Exception:
+            pass
 
     for idx, img_file in enumerate(sample_images):
         print(f"\n🖼️ Analysing sample image {idx+1}/{num_samples}: {img_file}")
@@ -270,6 +280,22 @@ def run_diagnostics(
                 )
 
                 ax[i, 1].imshow(res_img.resize(original_img_size))
+
+                # progress update for each contrast value processed
+                completed_steps += 1
+                if progress_callback:
+                    try:
+                        pct = int((completed_steps / total_steps) * 100)
+                        progress_callback({
+                            'progress': pct,
+                            'message': f'Processed {completed_steps}/{total_steps} contrast tests',
+                            'current_image_index': idx + 1,
+                            'total_images': num_samples,
+                            'current_contrast_index': i + 1,
+                            'total_contrasts': len(contrast_values),
+                        })
+                    except Exception:
+                        pass
                 ax[i, 0].set_xticks([])
                 ax[i, 0].set_yticks([])
                 ax[i, 1].set_xticks([])
