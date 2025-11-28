@@ -293,12 +293,39 @@ document.getElementById('preprocess-btn').addEventListener('click', async functi
 
         if (!uploadResponse.ok) throw new Error('Upload failed');
 
+        let statsFilePath = null;
+
+        // Handle statistics file if not using calculated stats
+        if (!useCalculatedStats) {
+            const statsFile = document.getElementById('stats-file-upload').files[0];
+            if (!statsFile) {
+                throw new Error('Please select a statistics file (.npy) or check "Use calculated statistics"');
+            }
+
+            const statsFormData = new FormData();
+            statsFormData.append('stats_file', statsFile);
+
+            const statsUploadResponse = await fetch('/api/upload-stats', {
+                method: 'POST',
+                body: statsFormData
+            });
+
+            if (!statsUploadResponse.ok) {
+                const error = await statsUploadResponse.json();
+                throw new Error(error.error || 'Statistics file upload failed');
+            }
+
+            const statsData = await statsUploadResponse.json();
+            statsFilePath = statsData.stats_path;
+        }
+
         // Preprocess images
         const preprocessResponse = await fetch('/api/preprocess-images', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 calculate_stats: useCalculatedStats,
+                stats_file: statsFilePath,
                 output_dir: outputDir
             })
         });
@@ -541,10 +568,11 @@ function showMessage(type, message, container) {
 }
 
 // Stats file upload toggle
-document.getElementById('use-calculated-stats').addEventListener('change', function () {
-    const statsFileGroup = document.getElementById('stats-file-group');
-    statsFileGroup.style.display = this.checked ? 'none' : 'block';
-});
+// Stats file upload toggle - Removed to keep it always visible
+// document.getElementById('use-calculated-stats').addEventListener('change', function () {
+//     const statsFileGroup = document.getElementById('stats-file-group');
+//     statsFileGroup.style.display = this.checked ? 'none' : 'block';
+// });
 
 // Initialize image upload area with preview
 function initImageUpload(areaId, inputId, previewId) {

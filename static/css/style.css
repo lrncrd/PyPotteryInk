@@ -64,12 +64,19 @@ body {
 }
 
 @keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
 }
 
 .splash-spinner {
-    border: 4px solid rgba(255,255,255,0.3);
+    border: 4px solid rgba(255, 255, 255, 0.3);
     border-top: 4px solid white;
     border-radius: 50%;
     width: 50px;
@@ -79,8 +86,13 @@ body {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .splash-title {
@@ -98,7 +110,7 @@ body {
     width: 100%;
     max-width: 500px;
     margin: 20px auto;
-    background: rgba(0,0,0,0.3);
+    background: rgba(0, 0, 0, 0.3);
     border-radius: 10px;
     overflow: hidden;
     height: 30px;
@@ -240,8 +252,15 @@ body {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Panel */
@@ -518,45 +537,45 @@ body {
     .container {
         padding: 10px;
     }
-    
+
     .app-header {
         padding: 20px;
     }
-    
+
     .header-top {
         flex-direction: column;
         gap: 15px;
     }
-    
+
     .logo-section {
         flex-direction: column;
         text-align: center;
     }
-    
+
     .logo-section h1 {
         font-size: 1.8em;
     }
-    
+
     .header-actions {
         justify-content: center;
     }
-    
+
     .tab-navigation {
         flex-direction: column;
     }
-    
+
     .tab-button {
         width: 100%;
     }
-    
+
     .panel {
         padding: 20px;
     }
-    
+
     .form-row {
         grid-template-columns: 1fr;
     }
-    
+
     .gallery {
         grid-template-columns: 1fr;
     }
@@ -567,7 +586,7 @@ body {
     display: inline-block;
     width: 20px;
     height: 20px;
-    border: 3px solid rgba(255,255,255,.3);
+    border: 3px solid rgba(255, 255, 255, .3);
     border-radius: 50%;
     border-top-color: white;
     animation: spin 1s ease-in-out infinite;
@@ -917,8 +936,13 @@ body.dark-mode .citation-box {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 .modal-content {
@@ -937,6 +961,7 @@ body.dark-mode .citation-box {
         transform: translateY(50px);
         opacity: 0;
     }
+
     to {
         transform: translateY(0);
         opacity: 1;
