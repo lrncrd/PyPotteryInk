@@ -17,8 +17,19 @@
 
 🚀 Try the [demo](https://githubtocolab.com/lrncrd/PyPotteryInk/blob/main/PyPotteryInk_example.ipynb) on Google Colab 🚀
 
+---
+
+### ☕ Support This Project
+
+If you find PyPotteryInk useful for your research, consider supporting its development:
+
+[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/lrncrd)
+
+Your support helps maintain and improve this open-source tool for the archaeological community!
+
 
 </div>
+
 
 ## 🎯 Overview
 
