@@ -4,7 +4,7 @@
 
 <img src="imgs/LogoInk.png" width="250"/>
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
+[![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![Documentation](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![HuggingFace](https://img.shields.io/badge/🤗%20Models-PyPotteryInk-yellow.svg)](https://huggingface.co/lrncrd/PyPotteryInk)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)

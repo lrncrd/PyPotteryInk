@@ -1,6 +1,26 @@
 // PyPotteryInk Flask App - Frontend JavaScript
 
-// Splash Screen Management
+// Model Download Overlay Helper Functions
+function showDownloadOverlay(message) {
+    const overlay = document.getElementById('model-download-overlay');
+    const messageEl = document.getElementById('download-message');
+    const statusEl = document.getElementById('download-status');
+
+    if (message) messageEl.textContent = message;
+    statusEl.textContent = 'Downloading... (check console for detailed progress)';
+    overlay.classList.add('visible');
+}
+
+function updateDownloadStatus(status) {
+    const statusEl = document.getElementById('download-status');
+    if (status) statusEl.textContent = status;
+}
+
+function hideDownloadOverlay() {
+    const overlay = document.getElementById('model-download-overlay');
+    overlay.classList.remove('visible');
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const splashScreen = document.getElementById('splash-screen');
     const mainContainer = document.getElementById('main-container');
@@ -166,6 +186,15 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
             }
         }
 
+        // Check if diffusion model (sd-turbo) is cached
+        const diffusionCheckResponse = await fetch('/api/check-diffusion-model');
+        const diffusionCheck = await diffusionCheckResponse.json();
+
+        // If sd-turbo is not cached, show download overlay
+        if (!diffusionCheck.cached) {
+            showDownloadOverlay('Downloading stabilityai/sd-turbo components. This is a one-time download (~2.5GB).');
+        }
+
         // Start diagnostics (server will run in background and return a session_id)
         const diagResponse = await fetch('/api/diagnostics', {
             method: 'POST',
@@ -217,6 +246,9 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
         eventSource.onmessage = function (event) {
             const data = JSON.parse(event.data);
             if (data.keepalive) return;
+
+            // Hide download overlay on first real message (model has loaded)
+            hideDownloadOverlay();
 
             if (data.error) {
                 showMessage('error', data.message || 'Diagnostics error', outputContainer);
@@ -577,6 +609,21 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
             }
         }
 
+        // Check if diffusion model (sd-turbo) is cached
+        statusText.textContent = 'Checking diffusion model...';
+        progressFill.style.width = '12%';
+
+        const diffusionCheckResponse = await fetch('/api/check-diffusion-model');
+        const diffusionCheck = await diffusionCheckResponse.json();
+
+        // If sd-turbo is not cached, show download overlay and simulate progress
+        // The actual download happens when the model is loaded
+        if (!diffusionCheck.cached) {
+            showDownloadOverlay('Downloading stabilityai/sd-turbo components. This is a one-time download (~2.5GB).');
+            // Don't await the simulation - let it run in the background
+            // The overlay will be hidden when processing starts successfully
+        }
+
         // Start processing
         statusText.textContent = 'Starting processing...';
         progressFill.style.width = '15%';
@@ -612,6 +659,9 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
                 // Just a keepalive, ignore
                 return;
             }
+
+            // Hide download overlay on first real message (model has loaded)
+            hideDownloadOverlay();
 
             if (data.error) {
                 showMessage('error', data.message, outputContainer);

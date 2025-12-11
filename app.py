@@ -25,7 +25,7 @@ app.config['OUTPUT_FOLDER'] = 'temp_output'
 # Global progress tracking
 progress_queues = {}
 
-version = "2.0.0"
+version = "2.0.1"
 
 # Configuration of models with automatic prompts
 MODELS = {
@@ -138,6 +138,35 @@ def hardware_check():
     except Exception as e:
         print(f"Hardware check error: {str(e)}")  # Debug log
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/check-diffusion-model', methods=['GET'])
+def check_diffusion_model():
+    """Check if the sd-turbo diffusion model is already cached locally"""
+    try:
+        # Check if the local HF cache contains the sd-turbo model files
+        cache_dir = os.path.join(MODELS_DIR, '.cache', 'huggingface', 'hub')
+        
+        # Look for stabilityai--sd-turbo folder in the cache
+        sd_turbo_cached = False
+        if os.path.exists(cache_dir):
+            for item in os.listdir(cache_dir):
+                if 'sd-turbo' in item.lower() or 'stabilityai' in item.lower():
+                    # Check if it has substantial content (not just refs)
+                    item_path = os.path.join(cache_dir, item)
+                    if os.path.isdir(item_path):
+                        snapshots_dir = os.path.join(item_path, 'snapshots')
+                        if os.path.exists(snapshots_dir) and os.listdir(snapshots_dir):
+                            sd_turbo_cached = True
+                            break
+        
+        return jsonify({
+            "success": True,
+            "cached": sd_turbo_cached,
+            "cache_dir": cache_dir
+        })
+    except Exception as e:
+        print(f"Diffusion model check error: {str(e)}")
+        return jsonify({"success": False, "error": str(e), "cached": False}), 500
 
 @app.route('/api/download-model', methods=['POST'])
 def api_download_model():

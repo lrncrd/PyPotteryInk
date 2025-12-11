@@ -1,4 +1,12 @@
 import os
+
+# Set Hugging Face cache to local models directory BEFORE importing diffusers/transformers
+# This ensures the sd-turbo model is saved in models/.cache/huggingface instead of global HF cache
+_MODELS_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', '.cache', 'huggingface')
+os.makedirs(_MODELS_CACHE_DIR, exist_ok=True)
+os.environ['HF_HOME'] = _MODELS_CACHE_DIR
+os.environ['HUGGINGFACE_HUB_CACHE'] = os.path.join(_MODELS_CACHE_DIR, 'hub')
+
 import requests
 from tqdm import tqdm
 from diffusers import DDPMScheduler
