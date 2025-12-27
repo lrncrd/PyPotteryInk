@@ -4,7 +4,7 @@
 
 <img src="imgs/LogoInk.png" width="250"/>
 
-[![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
+[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![Documentation](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://lrncrd.github.io/PyPotteryInk/)
 [![HuggingFace](https://img.shields.io/badge/🤗%20Models-PyPotteryInk-yellow.svg)](https://huggingface.co/lrncrd/PyPotteryInk)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
@@ -214,17 +214,14 @@ Based on img2img-turbo by [GaParmar](https://github.com/GaParmar/img2img-turbo)
 
 The original code was released under the MIT Licence. The changes made in this fork are released under the Apache License 2.0.
 
-## 🆕 What's New in Version 2.0.0
 
-- **Flask Web Interface**: Complete redesign with Flask for better performance and reliability
-- **Real-time Progress Updates**: Server-Sent Events (SSE) for live processing status
-- **Custom Model Support**: Upload and use your own fine-tuned models
-- **5h-PAPERGRID Model**: New specialized model for handling paper grid tables
-- **Improved Session Management**: Better handling of multiple processing sessions
-- **Better Error Handling**: More informative error messages and recovery options
-- **Streamlined Interface**: Cleaner, more intuitive user experience
-- **Directory Picker**: Native file system dialogs for selecting output directories
-- **Comparison Images**: Automatic generation of before/after comparisons
+
+
+## 🆕 What's New in Version 2.1.0
+
+- Modified System Requirements Check
+- Added Pixel
+- Minor UI Improvements
 
 ## 🛠️ Development Setup
 

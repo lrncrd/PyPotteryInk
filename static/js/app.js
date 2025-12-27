@@ -91,7 +91,52 @@ document.getElementById('check-hardware-btn').addEventListener('click', async fu
         const data = await response.json();
 
         if (data.success) {
-            reportContainer.innerHTML = `<pre>${data.report}</pre>`;
+            const report = data.report;
+            const suitability = report.suitability;
+            const components = report.components;
+            const tips = report.tips || [];
+
+            // Build HTML
+            let html = '<div class="hardware-report">';
+
+            // Suitability badge
+            html += `<div class="suitability-badge suitability-${suitability.level}">
+                <span class="emoji">${suitability.emoji}</span>
+                <span>${suitability.label}</span>
+            </div>`;
+
+            // Conclusion
+            html += `<p class="suitability-conclusion">${suitability.conclusion}</p>`;
+
+            // Component cards
+            html += '<div class="hardware-cards">';
+            for (const [key, comp] of Object.entries(components)) {
+                const statusIcon = comp.status === 'excellent' ? '✅' : comp.status === 'adequate' ? '⚠️' : '❌';
+                html += `<div class="hardware-card">
+                    <div class="hardware-card-header">
+                        <span class="hardware-card-icon">${comp.icon}</span>
+                        <span class="hardware-card-title">${comp.name}</span>
+                    </div>
+                    <div class="hardware-card-value">${comp.value}</div>
+                    <div class="hardware-card-status status-${comp.status}">
+                        ${statusIcon} ${comp.message}
+                    </div>
+                </div>`;
+            }
+            html += '</div>';
+
+            // Tips
+            if (tips.length > 0) {
+                html += '<div class="hardware-tips"><h4>💡 Tips</h4><ul>';
+                tips.forEach(tip => {
+                    html += `<li>${tip}</li>`;
+                });
+                html += '</ul></div>';
+            }
+
+            html += '</div>';
+
+            reportContainer.innerHTML = html;
             reportContainer.style.display = 'block';
         } else {
             showMessage('error', 'Hardware check failed: ' + data.error, reportContainer);
@@ -144,6 +189,12 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
     const overlap = document.getElementById('diag-overlap').value;
     const contrastValues = document.getElementById('diag-contrast').value;
 
+    // Max 5 images check
+    if (files.length > 5) {
+        alert('Maximum 5 images allowed for diagnostics. Please select fewer images.');
+        return;
+    }
+
     const btn = this;
     const outputContainer = document.getElementById('diagnostics-output');
     const gallery = document.getElementById('diagnostics-gallery');
@@ -152,8 +203,12 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
     btn.innerHTML = '<span class="loading"></span> Running...';
     outputContainer.style.display = 'none';
     gallery.style.display = 'none';
+    gallery.innerHTML = '';
 
     try {
+        // Clear diagnostics folder first
+        await fetch('/api/clear-diagnostics', { method: 'POST' });
+
         // Upload images
         const formData = new FormData();
         Array.from(files).forEach(file => formData.append('files', file));
@@ -214,15 +269,7 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
 
         // Backwards-compatible: if server returned results directly
         if (resp.success && resp.diagnostic_files) {
-            showMessage('success', `Diagnostics completed! Generated ${resp.diagnostic_files.length} visualizations.`, outputContainer);
-            gallery.innerHTML = '';
-            resp.diagnostic_files.forEach(file => {
-                const img = document.createElement('img');
-                img.src = `/api/get-image/diagnostics/${file}`;
-                img.alt = file;
-                gallery.appendChild(img);
-            });
-            gallery.style.display = 'grid';
+            showDiagnosticsComplete(resp.diagnostic_files, outputContainer, gallery);
             btn.disabled = false;
             btn.innerHTML = '<span>🚀</span> Run Diagnostics';
             return;
@@ -268,16 +315,7 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
                 eventSource.close();
 
                 const files = data.results.diagnostic_files || [];
-                showMessage('success', `Diagnostics completed! Generated ${files.length} visualizations.`, outputContainer);
-
-                gallery.innerHTML = '';
-                files.forEach(file => {
-                    const img = document.createElement('img');
-                    img.src = `/api/get-image/diagnostics/${file}`;
-                    img.alt = file;
-                    gallery.appendChild(img);
-                });
-                gallery.style.display = 'grid';
+                showDiagnosticsComplete(files, outputContainer, gallery);
 
                 btn.disabled = false;
                 btn.innerHTML = '<span>🚀</span> Run Diagnostics';
@@ -299,6 +337,75 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
         btn.disabled = false;
         btn.innerHTML = '<span>🚀</span> Run Diagnostics';
     }
+});
+
+// Helper function to show diagnostics complete with open folder button
+function showDiagnosticsComplete(files, outputContainer, gallery) {
+    let html = `<div class="message message-success">✅ Diagnostics completed! Generated ${files.length} visualizations.</div>`;
+    html += `<button class="btn btn-open-folder" onclick="openDiagnosticsFolder()">📁 Open Diagnostics Folder</button>`;
+    outputContainer.innerHTML = html;
+    outputContainer.style.display = 'block';
+
+    gallery.innerHTML = '';
+    files.forEach(file => {
+        const img = document.createElement('img');
+        img.src = `/api/get-image/diagnostics/${file}`;
+        img.alt = file;
+        img.onclick = function () { openLightbox(this.src); };
+        gallery.appendChild(img);
+    });
+    gallery.style.display = 'grid';
+}
+
+// Open diagnostics folder
+async function openDiagnosticsFolder() {
+    try {
+        await fetch('/api/open-folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder_path: 'temp_diagnostics' })
+        });
+    } catch (error) {
+        console.error('Failed to open folder:', error);
+    }
+}
+
+// Lightbox functions
+function openLightbox(src) {
+    const overlay = document.getElementById('lightbox-overlay');
+    const img = document.getElementById('lightbox-image');
+    img.src = src;
+    overlay.classList.add('active');
+}
+
+function closeLightbox() {
+    const overlay = document.getElementById('lightbox-overlay');
+    overlay.classList.remove('active');
+}
+
+// Lightbox event listeners
+document.addEventListener('DOMContentLoaded', function () {
+    const lightboxOverlay = document.getElementById('lightbox-overlay');
+    const lightboxClose = document.getElementById('lightbox-close');
+
+    if (lightboxClose) {
+        lightboxClose.addEventListener('click', closeLightbox);
+    }
+
+    if (lightboxOverlay) {
+        lightboxOverlay.addEventListener('click', function (e) {
+            if (e.target === lightboxOverlay) {
+                closeLightbox();
+            }
+        });
+    }
+
+    // Close on Escape key
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            closeLightbox();
+        }
+    });
 });
 
 // Calculate Statistics

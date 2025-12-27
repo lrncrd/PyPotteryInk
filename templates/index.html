@@ -31,7 +31,8 @@
         <div class="model-download-content">
             <div class="download-icon">📥</div>
             <h3>Downloading Diffusion Model...</h3>
-            <p id="download-message">Downloading stabilityai/sd-turbo components. This may take a few minutes on first run.</p>
+            <p id="download-message">Downloading stabilityai/sd-turbo components. This may take a few minutes on first
+                run.</p>
             <div class="download-progress-bar">
                 <div class="download-progress-fill" id="download-progress-fill"></div>
             </div>
@@ -52,6 +53,40 @@
                     </div>
                 </div>
                 <div class="header-actions">
+                    <a href="https://lrncrd.github.io/PyPottery/pypotteryink/usage.html" target="_blank"
+                        class="pixel-assistant-container" title="Need help?">
+                        <div class="pixel-speech-bubble">Need help?</div>
+                        <!-- SVG Icon -->
+                        <svg width="60" height="60" viewBox="30 45 180 140">
+                            <g id="pixel-monitor">
+                                <!-- Monitor Body -->
+                                <rect x="40" y="50" width="160" height="130" rx="15" ry="15" fill="#d0d0d0"
+                                    stroke="#444" stroke-width="3" />
+                                <rect x="55" y="65" width="130" height="90" rx="5" ry="5" fill="#a0a0a0" stroke="#444"
+                                    stroke-width="2" />
+                                <!-- Screen -->
+                                <rect id="pixel-screen" x="60" y="70" width="120" height="80" rx="2" ry="2"
+                                    fill="#111" />
+
+                                <!-- Face: IDLE (Zzz...) -->
+                                <g id="pixel-face-idle" transform="translate(120, 115)">
+                                    <text x="0" y="5" text-anchor="middle" font-family="monospace" font-size="24"
+                                        fill="#0f0" font-weight="bold">Zzz...</text>
+                                </g>
+
+                                <!-- Face: AWAKE -->
+                                <g id="pixel-face-awake" transform="translate(120, 115)">
+                                    <rect x="-30" y="-15" width="10" height="12" rx="2" fill="#0f0" />
+                                    <rect x="20" y="-15" width="10" height="12" rx="2" fill="#0f0" />
+                                    <path d="M-15,10 Q0,25 15,10" stroke="#0f0" stroke-width="4" fill="none"
+                                        stroke-linecap="round" />
+                                </g>
+
+                                <!-- Power Light -->
+                                <circle cx="180" cy="165" r="3" fill="#e74c3c" stroke="#c0392b" stroke-width="1" />
+                            </g>
+                        </svg>
+                    </a>
                     <button id="theme-toggle" class="icon-btn" aria-label="Toggle Dark Mode">
                         <span class="theme-icon">🌙</span>
                     </button>
@@ -162,47 +197,10 @@
         <div class="tab-content" id="preprocessing-tab">
             <div class="panel">
                 <h2>📊 Image Preprocessing</h2>
-                <p class="info-text">Calculate statistics from training images and apply preprocessing to optimize
-                    images for AI processing.</p>
+                <p class="info-text">Apply preprocessing to optimize images for AI processing. Upload your images and a
+                    statistics file to adjust brightness and contrast.</p>
 
-                <h3>Step 1: Calculate Statistics (Optional)</h3>
-                <div class="form-group">
-                    <label>
-                        Upload Images for Statistics:
-                        <span class="info-tooltip"
-                            data-tooltip="Upload a representative sample of your training images. The system will analyze their properties (brightness, contrast, etc.) to create optimal preprocessing parameters.">ℹ️</span>
-                    </label>
-                    <div class="image-upload-area" id="stats-upload-area">
-                        <input type="file" id="stats-image-upload" multiple accept="image/*" class="file-input-hidden">
-                        <div class="upload-placeholder">
-                            <div class="upload-icon">📁</div>
-                            <p>Click to select images or drag & drop here</p>
-                            <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
-                        </div>
-                        <div class="upload-preview" id="stats-preview" style="display: none;"></div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="stats-save-path">
-                        Save Statistics As:
-                        <span class="info-tooltip"
-                            data-tooltip="Path where the calculated statistics will be saved as a .npy file. You can reuse this file later for preprocessing other images.">ℹ️</span>
-                    </label>
-                    <div class="input-with-button">
-                        <input type="text" id="stats-save-path" value="./custom_stats.npy" class="form-control">
-                        <button type="button" id="browse-stats-path" class="btn btn-secondary btn-small">📁
-                            Browse...</button>
-                    </div>
-                </div>
-
-                <button id="calculate-stats-btn" class="btn btn-secondary" disabled>
-                    <span>📊</span> Calculate Statistics
-                </button>
-
-                <div id="stats-output" class="output-container" style="display: none;"></div>
-
-                <h3>Step 2: Apply Preprocessing</h3>
+                <h3>Apply Preprocessing</h3>
                 <div class="form-group">
                     <label>
                         Upload Images to Preprocess:
@@ -221,20 +219,11 @@
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="use-calculated-stats">
-                        Use calculated statistics from Step 1
-                        <span class="info-tooltip"
-                            data-tooltip="If checked, uses the statistics you just calculated above. If unchecked, you can upload a previously saved .npy statistics file.">ℹ️</span>
-                    </label>
-                </div>
-
                 <div class="form-group" id="stats-file-group">
                     <label for="stats-file-upload">
-                        Or Upload Statistics File (.npy):
+                        Upload Statistics File (.npy):
                         <span class="info-tooltip"
-                            data-tooltip="Upload a previously saved .npy statistics file. This allows you to reuse statistics calculated from other image sets.">ℹ️</span>
+                            data-tooltip="Upload a .npy statistics file. You can use one of the provided statistics files (Montale, Cimino) or create your own in the Advanced section.">ℹ️</span>
                     </label>
                     <input type="file" id="stats-file-upload" accept=".npy" class="file-input">
                 </div>
@@ -266,6 +255,54 @@
                 </div>
 
                 <div id="preprocess-output" class="output-container" style="display: none;"></div>
+
+                <!-- Advanced Section - Collapsible -->
+                <details class="advanced-section">
+                    <summary class="advanced-toggle">
+                        <span>⚙️ Advanced: Calculate Custom Statistics</span>
+                    </summary>
+                    <div class="advanced-content">
+                        <p class="info-text">Create your own statistics file from a set of representative images. This
+                            is optional - you can use the provided statistics files instead.</p>
+
+                        <div class="form-group">
+                            <label>
+                                Upload Images for Statistics:
+                                <span class="info-tooltip"
+                                    data-tooltip="Upload a representative sample of your training images. The system will analyze their properties (brightness, contrast, etc.) to create optimal preprocessing parameters.">ℹ️</span>
+                            </label>
+                            <div class="image-upload-area" id="stats-upload-area">
+                                <input type="file" id="stats-image-upload" multiple accept="image/*"
+                                    class="file-input-hidden">
+                                <div class="upload-placeholder">
+                                    <div class="upload-icon">📁</div>
+                                    <p>Click to select images or drag & drop here</p>
+                                    <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                                </div>
+                                <div class="upload-preview" id="stats-preview" style="display: none;"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="stats-save-path">
+                                Save Statistics As:
+                                <span class="info-tooltip"
+                                    data-tooltip="Path where the calculated statistics will be saved as a .npy file. You can reuse this file later for preprocessing other images.">ℹ️</span>
+                            </label>
+                            <div class="input-with-button">
+                                <input type="text" id="stats-save-path" value="./custom_stats.npy" class="form-control">
+                                <button type="button" id="browse-stats-path" class="btn btn-secondary btn-small">📁
+                                    Browse...</button>
+                            </div>
+                        </div>
+
+                        <button id="calculate-stats-btn" class="btn btn-secondary" disabled>
+                            <span>📊</span> Calculate Statistics
+                        </button>
+
+                        <div id="stats-output" class="output-container" style="display: none;"></div>
+                    </div>
+                </details>
             </div>
         </div>
 
@@ -514,6 +551,14 @@
 
 
 
+    </div>
+
+    <!-- Lightbox Modal for fullscreen images -->
+    <div id="lightbox-overlay" class="lightbox-overlay">
+        <div class="lightbox-content">
+            <button class="lightbox-close" id="lightbox-close">&times;</button>
+            <img src="" alt="Fullscreen preview" class="lightbox-image" id="lightbox-image">
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>

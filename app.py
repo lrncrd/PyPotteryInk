@@ -25,7 +25,7 @@ app.config['OUTPUT_FOLDER'] = 'temp_output'
 # Global progress tracking
 progress_queues = {}
 
-version = "2.0.1"
+version = "2.1.0"
 
 # Configuration of models with automatic prompts
 MODELS = {
@@ -119,7 +119,7 @@ def hardware_check():
     try:
         print("Hardware check called")  # Debug log
         checker = HardwareChecker()
-        report = checker.generate_report()
+        structured_report = checker.get_structured_report()
         
         # Extract hardware availability info
         hardware = {
@@ -132,7 +132,7 @@ def hardware_check():
         
         return jsonify({
             "success": True, 
-            "report": report,
+            "report": structured_report,
             "hardware": hardware
         })
     except Exception as e:
@@ -821,6 +821,47 @@ def get_image(folder, filename):
             return jsonify({"error": f"Image not found: {image_path}"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/clear-diagnostics', methods=['POST'])
+def clear_diagnostics():
+    """Clear the diagnostics folder before a new run"""
+    try:
+        diagnostics_dir = 'temp_diagnostics'
+        if os.path.exists(diagnostics_dir):
+            shutil.rmtree(diagnostics_dir)
+        os.makedirs(diagnostics_dir, exist_ok=True)
+        return jsonify({"success": True, "message": "Diagnostics folder cleared"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/open-folder', methods=['POST'])
+def open_folder():
+    """Open a folder in the system file explorer"""
+    try:
+        data = request.json
+        folder_path = data.get('folder_path', 'temp_diagnostics')
+        
+        # Make path absolute
+        if not os.path.isabs(folder_path):
+            folder_path = os.path.abspath(folder_path)
+        
+        if not os.path.exists(folder_path):
+            return jsonify({"success": False, "error": "Folder does not exist"}), 404
+        
+        import subprocess
+        import platform
+        
+        system = platform.system()
+        if system == 'Windows':
+            os.startfile(folder_path)
+        elif system == 'Darwin':  # macOS
+            subprocess.run(['open', folder_path])
+        else:  # Linux
+            subprocess.run(['xdg-open', folder_path])
+        
+        return jsonify({"success": True, "message": "Folder opened"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     print("Starting PyPotteryInk Flask Application...")

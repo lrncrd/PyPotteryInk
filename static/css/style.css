@@ -1264,3 +1264,412 @@ body.dark-mode .citation-box {
     font-size: 0.85rem;
     font-weight: 500;
 }
+
+/* 
+    Pixel Assistant Styles 
+    ----------------------
+*/
+
+.pixel-assistant-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    position: relative;
+}
+
+.pixel-assistant-container:hover {
+    transform: scale(1.1);
+}
+
+/* Speech Bubble */
+.pixel-speech-bubble {
+    background: #fff;
+    color: #000;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 2px solid #444;
+    font-weight: bold;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    opacity: 0;
+    transform: translateX(10px);
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.1);
+    margin-right: 5px;
+    /* Added for spacing if not using gap */
+}
+
+.pixel-assistant-container:hover .pixel-speech-bubble {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Monitor and Face Animations */
+#pixel-face-idle {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s;
+    animation: pixel-breathe 4s infinite ease-in-out;
+}
+
+#pixel-face-awake {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s;
+}
+
+/* Hover States for Face - Ensuring distinct states (no ghosting) */
+.pixel-assistant-container:hover #pixel-face-idle {
+    opacity: 0 !important;
+    visibility: hidden;
+    transition-delay: 0s;
+}
+
+.pixel-assistant-container:hover #pixel-face-awake {
+    opacity: 1 !important;
+    visibility: visible;
+    transition-delay: 0s;
+}
+
+/* Screen Color Change on Hover */
+.pixel-assistant-container:hover #pixel-screen {
+    fill: #002200;
+}
+
+/* Monitor Wiggle/Scale Effect */
+.pixel-assistant-container svg {
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform-origin: center;
+}
+
+.pixel-assistant-container:hover svg {
+    transform: scale(1.1) rotate(-5deg);
+}
+
+@keyframes pixel-breathe {
+
+    0%,
+    100% {
+        opacity: 0.7;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+}
+
+/* =============================================
+   Hardware Report Styles
+   ============================================= */
+
+.hardware-report {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Suitability Badge */
+.suitability-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 20px 30px;
+    border-radius: 12px;
+    font-size: 1.4em;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.suitability-badge .emoji {
+    font-size: 1.8em;
+}
+
+.suitability-highly_recommended {
+    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    color: #065f46;
+    border: 2px solid #10b981;
+}
+
+.suitability-recommended {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    color: #92400e;
+    border: 2px solid #f59e0b;
+}
+
+.suitability-limited_use {
+    background: linear-gradient(135deg, #fef9c3, #fef08a);
+    color: #854d0e;
+    border: 2px solid #eab308;
+}
+
+.suitability-not_recommended {
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    color: #991b1b;
+    border: 2px solid #ef4444;
+}
+
+.suitability-conclusion {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 1em;
+    margin-bottom: 15px;
+}
+
+/* Component Cards Grid */
+.hardware-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+/* Individual Card */
+.hardware-card {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 20px;
+    border: 2px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.hardware-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.hardware-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.hardware-card-icon {
+    font-size: 2em;
+    line-height: 1;
+}
+
+.hardware-card-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.hardware-card-value {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    word-break: break-word;
+}
+
+.hardware-card-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.status-excellent {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+}
+
+.status-adequate {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #f59e0b;
+}
+
+.status-limited {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #ef4444;
+}
+
+/* Tips Section */
+.hardware-tips {
+    background: #f0f9ff;
+    border-left: 4px solid var(--info-color);
+    padding: 15px 20px;
+    border-radius: 6px;
+    margin-top: 10px;
+}
+
+.hardware-tips h4 {
+    margin: 0 0 10px 0;
+    color: var(--text-primary);
+    font-size: 1em;
+}
+
+.hardware-tips ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.hardware-tips li {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    padding: 3px 0;
+}
+
+/* Dark mode adjustments */
+body.dark-mode .hardware-card {
+    background: var(--bg-secondary);
+}
+
+body.dark-mode .status-excellent {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+    border-color: #10b981;
+}
+
+body.dark-mode .status-adequate {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fcd34d;
+    border-color: #f59e0b;
+}
+
+body.dark-mode .status-limited {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border-color: #ef4444;
+}
+
+body.dark-mode .hardware-tips {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+/* =============================================
+   Advanced Collapsible Section
+   ============================================= */
+
+.advanced-section {
+    margin-top: 30px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+}
+
+.advanced-toggle {
+    padding: 15px 20px;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-primary);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
+    transition: background 0.2s ease;
+}
+
+.advanced-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.advanced-toggle::before {
+    content: '▶';
+    font-size: 0.8em;
+    transition: transform 0.2s ease;
+}
+
+.advanced-section[open] .advanced-toggle::before {
+    transform: rotate(90deg);
+}
+
+.advanced-toggle:hover {
+    background: var(--bg-primary);
+}
+
+.advanced-content {
+    padding: 0 20px 20px 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* =============================================
+   Lightbox / Image Fullscreen Modal
+   ============================================= */
+
+.lightbox-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.lightbox-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.lightbox-content {
+    position: relative;
+    max-width: 95vw;
+    max-height: 95vh;
+}
+
+.lightbox-image {
+    max-width: 95vw;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.lightbox-close {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 2em;
+    cursor: pointer;
+    padding: 10px;
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
+}
+
+.lightbox-close:hover {
+    opacity: 1;
+}
+
+/* Gallery clickable images */
+.gallery img {
+    cursor: pointer;
+}
+
+.gallery img:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Open Folder Button */
+.btn-open-folder {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    margin-top: 15px;
+}
+
+.btn-open-folder:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}

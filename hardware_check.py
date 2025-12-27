@@ -4,7 +4,7 @@ import platform
 import psutil
 import time
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 try:
     import cpuinfo
@@ -12,17 +12,25 @@ try:
 except ImportError:
     CPUINFO_AVAILABLE = False
 
+# Status constants
+STATUS_EXCELLENT = "excellent"
+STATUS_ADEQUATE = "adequate"
+STATUS_LIMITED = "limited"
+
+# Suitability levels
+SUITABILITY_HIGHLY_RECOMMENDED = "highly_recommended"
+SUITABILITY_RECOMMENDED = "recommended"
+SUITABILITY_LIMITED_USE = "limited_use"
+SUITABILITY_NOT_RECOMMENDED = "not_recommended"
+
 class HardwareChecker:
     """Internal class for hardware checking"""
     def __init__(self):
         self.info = self.get_hardware_info()
-        self.recommendations = []
-        self.warnings = []
-        self.score = 0
-        self.max_score = 100
+        self.components = {}
         self.evaluate_hardware()
 
-    def get_hardware_info(self) -> Dict[str, str]:
+    def get_hardware_info(self) -> Dict[str, Any]:
         """Collects system hardware information"""
         info = {}
 
@@ -34,10 +42,11 @@ class HardwareChecker:
             info["gpu_mem"] = gpu_mem
             info["gpu_name"] = gpu_name.lower()
             info["has_cuda"] = True
+            info["has_mps"] = False
         elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
             # Apple Metal Performance Shaders
             info["gpu"] = "Apple Metal Performance Shaders (MPS)"
-            info["gpu_mem"] = psutil.virtual_memory().total / (1024**3)  # Usa RAM totale come riferimento
+            info["gpu_mem"] = psutil.virtual_memory().total / (1024**3)  # Uses total RAM as reference
             info["gpu_name"] = "mps"
             info["has_mps"] = True
             info["has_cuda"] = False
@@ -95,163 +104,182 @@ class HardwareChecker:
 
             write_speed = (100 / write_time)  # MB/s
             read_speed = (100 / read_time)    # MB/s
-            return f"Read: {read_speed:.1f} MB/s | Write: {write_speed:.1f} MB/s", (read_speed, write_speed)
+            return f"Read: {read_speed:.0f} MB/s | Write: {write_speed:.0f} MB/s", (read_speed, write_speed)
         except Exception as e:
             return f"Test failed: {str(e)}", (0, 0)
 
     def evaluate_hardware(self):
-        """Evaluates hardware and generates recommendations with score"""
-        # GPU analysis
-        if self.info.get("has_cuda", False):
-            if "rtx" in self.info["gpu_name"] and self.info["gpu_mem"] >= 6:
-                self.score += 35
-                self.recommendations.append("✅ RTX GPU with at least 6GB memory - Ideal for processing")
-            elif self.info["gpu_mem"] >= 8:
-                self.score += 30
-                self.recommendations.append("✅ GPU with at least 8GB memory - Excellent for processing")
-            elif self.info["gpu_mem"] >= 4:
-                self.score += 20
-                self.recommendations.append("⚠️ GPU with 4-8GB memory - Adequate but you may encounter limitations with large images")
-            else:
-                self.warnings.append("⚠️ GPU with less than 4GB memory - You may encounter problems with large images")
-                self.score += 10
-        elif self.info.get("has_mps", False):
-            # Apple Silicon MPS support
-            self.score += 35
-            self.recommendations.append("✅ Apple Metal Performance Shaders (MPS) - Excellent acceleration for Apple Silicon")
-        else:
-            # No accelerated GPU
-            self.score += 5
-            self.warnings.append("⚠️ No accelerated GPU detected - Processing will be much slower on CPU")
-
-        # RAM analysis
-        if self.info["ram_gb"] >= 16:
-            self.score += 20
-            self.recommendations.append("✅ 16GB or more RAM - Ideal for large image batches")
-        elif self.info["ram_gb"] >= 8:
-            self.score += 15
-            self.recommendations.append("✅ 8GB or more RAM - Adequate for processing")
-        elif self.info["ram_gb"] >= 6:
-            self.score += 10
-            self.recommendations.append("⚠️ 6-8GB RAM - Works but you may encounter limitations with large batches")
-        else:
-            self.warnings.append("⚠️ Less than 6GB RAM - You may encounter problems with image batches")
-            self.score += 5
-
-        # CPU analysis
-        cpu_score = 0
-        cpu_message = ""
+        """Evaluates hardware and generates categorical ratings"""
         
-        # Check for modern CPUs
-        modern_cpu = any(brand in self.info["cpu_brand"] for brand in ["intel", "amd"]) and \
-                     any(gen in self.info["cpu_brand"] for gen in ["i5", "i7", "i9", "ryzen 5", "ryzen 7", "ryzen 9"])
+        # GPU evaluation
+        gpu_status = STATUS_LIMITED
+        gpu_message = ""
+        
+        if self.info.get("has_mps", False):
+            gpu_status = STATUS_EXCELLENT
+            gpu_message = "Apple Silicon with Metal acceleration"
+        elif self.info.get("has_cuda", False):
+            if "rtx" in self.info["gpu_name"] and self.info["gpu_mem"] >= 6:
+                gpu_status = STATUS_EXCELLENT
+                gpu_message = f"RTX GPU with {self.info['gpu_mem']:.0f}GB VRAM"
+            elif self.info["gpu_mem"] >= 8:
+                gpu_status = STATUS_EXCELLENT
+                gpu_message = f"GPU with {self.info['gpu_mem']:.0f}GB VRAM"
+            elif self.info["gpu_mem"] >= 4:
+                gpu_status = STATUS_ADEQUATE
+                gpu_message = f"GPU with {self.info['gpu_mem']:.0f}GB VRAM (may have limitations with large images)"
+            else:
+                gpu_status = STATUS_LIMITED
+                gpu_message = f"GPU with only {self.info['gpu_mem']:.0f}GB VRAM"
+        else:
+            gpu_status = STATUS_LIMITED
+            gpu_message = "No GPU acceleration available (CPU only)"
+        
+        self.components["gpu"] = {
+            "name": "GPU",
+            "icon": "🎮",
+            "value": self.info["gpu"],
+            "status": gpu_status,
+            "message": gpu_message
+        }
+
+        # RAM evaluation
+        ram_gb = self.info["ram_gb"]
+        if ram_gb >= 16:
+            ram_status = STATUS_EXCELLENT
+            ram_message = "Ideal for large image batches"
+        elif ram_gb >= 8:
+            ram_status = STATUS_ADEQUATE
+            ram_message = "Adequate for processing"
+        else:
+            ram_status = STATUS_LIMITED
+            ram_message = "May have issues with batch processing"
+        
+        self.components["ram"] = {
+            "name": "RAM",
+            "icon": "💾",
+            "value": self.info["ram"],
+            "status": ram_status,
+            "message": ram_message
+        }
+
+        # CPU evaluation
+        cpu_cores = self.info["cpu_cores"]
+        cpu_brand = self.info["cpu_brand"]
         
         # Check for Apple Silicon
-        apple_silicon = "apple" in self.info["cpu_brand"] or "m1" in self.info["cpu_brand"] or "m2" in self.info["cpu_brand"]
+        apple_silicon = "apple" in cpu_brand or "m1" in cpu_brand or "m2" in cpu_brand or "m3" in cpu_brand or "m4" in cpu_brand
+        
+        # Check for modern CPUs
+        modern_cpu = any(brand in cpu_brand for brand in ["intel", "amd"]) and \
+                     any(gen in cpu_brand for gen in ["i5", "i7", "i9", "ryzen 5", "ryzen 7", "ryzen 9"])
         
         if apple_silicon:
-            cpu_score = 25
-            cpu_message = "✅ Apple Silicon processor (M1/M2) - Excellent for processing"
-        elif modern_cpu:
-            if self.info["cpu_cores"] >= 8:
-                cpu_score = 20
-                cpu_message = "✅ Modern processor with 8+ cores - Excellent for processing"
-            elif self.info["cpu_cores"] >= 4:
-                cpu_score = 15
-                cpu_message = "✅ Modern processor with 4+ cores - Adequate for processing"
-            else:
-                cpu_score = 10
-                cpu_message = "⚠️ Modern processor but with few cores - May be limited for large batches"
+            cpu_status = STATUS_EXCELLENT
+            cpu_message = "Apple Silicon processor"
+        elif modern_cpu and cpu_cores >= 8:
+            cpu_status = STATUS_EXCELLENT
+            cpu_message = f"Modern processor with {cpu_cores} cores"
+        elif modern_cpu and cpu_cores >= 4:
+            cpu_status = STATUS_ADEQUATE
+            cpu_message = f"Modern processor with {cpu_cores} cores"
+        elif cpu_cores >= 4:
+            cpu_status = STATUS_ADEQUATE
+            cpu_message = f"Processor with {cpu_cores} cores"
         else:
-            if self.info["cpu_cores"] >= 4:
-                cpu_score = 10
-                cpu_message = "⚠️ Processor with 4+ cores"
-            else:
-                cpu_score = 5
-                cpu_message = "⚠️ Processor with less than 4 cores - Limited performance"
-                self.warnings.append("⚠️ CPU with less than 4 cores. Performance may be significantly limited.")
+            cpu_status = STATUS_LIMITED
+            cpu_message = f"Only {cpu_cores} cores available"
         
-        self.score += cpu_score
-        if cpu_message:
-            self.recommendations.append(cpu_message)
+        self.components["cpu"] = {
+            "name": "CPU",
+            "icon": "🖥️",
+            "value": self.info["cpu"],
+            "status": cpu_status,
+            "message": cpu_message
+        }
 
-        # Disk speed analysis
-        if self.info["disk_speed_read"] >= 500 and self.info["disk_speed_write"] >= 300:
-            self.score += 15
-            self.recommendations.append("✅ Fast disk (NVMe SSD) - Excellent for loading/saving images")
-        elif self.info["disk_speed_read"] >= 200 and self.info["disk_speed_write"] >= 100:
-            self.score += 10
-            self.recommendations.append("⚠️ Decent disk but could be improved with an NVMe SSD")
-        else:
-            self.score += 5
-            self.recommendations.append("⚠️ Slow disk - An NVMe SSD would significantly improve performance")
-
-        # Operating system check
-        if self.info["os"] == "darwin":
-            if apple_silicon:
-                self.score += 5
-                self.recommendations.append("✅ macOS system on Apple Silicon - Fully optimized support")
-            else:
-                self.score += 3
-                self.recommendations.append("✅ macOS system - Good compatibility")
-
-        # General recommendations
-        self.recommendations.append("💡 If using a laptop, ensure it's well ventilated and connected to power")
-        self.recommendations.append("💡 Consider using a cooling pad for laptops to avoid thermal throttling")
-
-    def get_recommendation_level(self) -> Tuple[str, str]:
-        """Returns recommendation level based on score"""
-        percentage = (self.score / self.max_score) * 100
+        # Disk evaluation
+        read_speed = self.info["disk_speed_read"]
+        write_speed = self.info["disk_speed_write"]
         
-        if percentage >= 85:
-            return "HIGHLY RECOMMENDED", "🟢"
-        elif percentage >= 65:
-            return "RECOMMENDED", "🟠"
-        elif percentage >= 40:
-            return "LIMITED USE", "🟡"
+        if read_speed >= 500 and write_speed >= 300:
+            disk_status = STATUS_EXCELLENT
+            disk_message = "Fast NVMe SSD"
+        elif read_speed >= 200 and write_speed >= 100:
+            disk_status = STATUS_ADEQUATE
+            disk_message = "SSD storage"
         else:
-            return "NOT RECOMMENDED", "🔴"
+            disk_status = STATUS_LIMITED
+            disk_message = "Slow storage (consider upgrading to SSD)"
+        
+        self.components["disk"] = {
+            "name": "Storage",
+            "icon": "💿",
+            "value": self.info["disk_speed"],
+            "status": disk_status,
+            "message": disk_message
+        }
+
+    def get_suitability(self) -> Tuple[str, str, str]:
+        """Returns overall suitability level, label and emoji"""
+        gpu_status = self.components["gpu"]["status"]
+        
+        # Count status levels
+        statuses = [c["status"] for c in self.components.values()]
+        has_limited = STATUS_LIMITED in statuses
+        all_excellent = all(s == STATUS_EXCELLENT for s in statuses)
+        
+        if gpu_status == STATUS_LIMITED:
+            return SUITABILITY_NOT_RECOMMENDED, "Not Recommended", "🔴"
+        elif has_limited:
+            return SUITABILITY_LIMITED_USE, "Limited Use", "🟡"
+        elif all_excellent or gpu_status == STATUS_EXCELLENT:
+            return SUITABILITY_HIGHLY_RECOMMENDED, "Highly Recommended", "🟢"
+        else:
+            return SUITABILITY_RECOMMENDED, "Recommended", "🟠"
+
+    def get_structured_report(self) -> Dict[str, Any]:
+        """Returns structured report as dictionary for JSON serialization"""
+        suitability_level, suitability_label, suitability_emoji = self.get_suitability()
+        
+        # Generate conclusion message
+        if suitability_level == SUITABILITY_HIGHLY_RECOMMENDED:
+            conclusion = "Your hardware is excellent for PyPotteryInk!"
+        elif suitability_level == SUITABILITY_RECOMMENDED:
+            conclusion = "Your hardware is adequate for PyPotteryInk."
+        elif suitability_level == SUITABILITY_LIMITED_USE:
+            conclusion = "Your hardware can run PyPotteryInk but may have performance limitations."
+        else:
+            conclusion = "Your hardware is not recommended. Processing may be very slow."
+        
+        return {
+            "suitability": {
+                "level": suitability_level,
+                "label": suitability_label,
+                "emoji": suitability_emoji,
+                "conclusion": conclusion
+            },
+            "components": self.components,
+            "tips": [
+                "Keep laptop well ventilated and connected to power during processing",
+                "Close other applications to maximize available memory"
+            ]
+        }
 
     def generate_report(self) -> str:
-        """Generates a complete report in markdown with score"""
-        report = "## 🖥️ Hardware Specifications\n"
-        report += f"- **GPU:** {self.info['gpu']}\n"
-        report += f"- **CPU:** {self.info['cpu']}\n"
-        report += f"- **RAM:** {self.info['ram']}\n"
-        report += f"- **Disk speed:** {self.info['disk_speed']}\n\n"
+        """Generates a complete report in markdown (legacy support)"""
+        structured = self.get_structured_report()
         
-        # Show score
-        percentage = (self.score / self.max_score) * 100
-        report += f"## 📊 Hardware Score: {self.score}/{self.max_score} ({percentage:.1f}%)\n\n"
-
-        if self.warnings:
-            report += "## ⚠️ Warnings\n"
-            report += "\n".join(f"- {w}" for w in self.warnings) + "\n\n"
-
-        if self.recommendations:
-            report += "## 💡 Recommendations\n"
-            report += "\n".join(f"- {r}" for r in self.recommendations) + "\n\n"
-
-        # Overall evaluation
-        level, emoji = self.get_recommendation_level()
-        report = f"## {emoji} Recommendation Level: {level}\n" + report
+        report = f"## {structured['suitability']['emoji']} {structured['suitability']['label']}\n\n"
+        report += f"{structured['suitability']['conclusion']}\n\n"
         
-        if level == "HIGHLY RECOMMENDED":
-            report += "## ✅ Conclusion\n"
-            report += "Your hardware is excellent for using PyPotteryInk! 🎉\n"
-        elif level == "RECOMMENDED":
-            report += "## ✅ Conclusion\n"
-            report += "Your hardware is adequate for using PyPotteryInk, but you may encounter some limitations with very large images.\n"
-        elif level == "LIMITED USE":
-            report += "## ⚠️ Conclusion\n"
-            report += "Your hardware can run PyPotteryInk but you may encounter significant performance limitations.\n"
-        else:
-            report += "## ❌ Conclusion\n"
-            report += "Your hardware is not recommended for PyPotteryInk. Processing may be very slow or impossible.\n"
+        report += "## 🖥️ Hardware Specifications\n"
+        for key, comp in structured['components'].items():
+            status_icon = "✅" if comp['status'] == STATUS_EXCELLENT else "⚠️" if comp['status'] == STATUS_ADEQUATE else "❌"
+            report += f"- **{comp['name']}:** {comp['value']} {status_icon}\n"
         
-        report += "\n💡 *If you're using a laptop, ensure it's well ventilated and connected to power during processing*"
-
         return report
+
 
 def run_hardware_check() -> str:
     """
