@@ -5,15 +5,28 @@ function showDownloadOverlay(message) {
     const overlay = document.getElementById('model-download-overlay');
     const messageEl = document.getElementById('download-message');
     const statusEl = document.getElementById('download-status');
+    const fillEl = document.getElementById('download-progress-fill');
 
     if (message) messageEl.textContent = message;
-    statusEl.textContent = 'Downloading... (check console for detailed progress)';
+    statusEl.textContent = 'Preparing download...';
+    if (fillEl) fillEl.style.width = '0%';
     overlay.classList.add('visible');
 }
 
 function updateDownloadStatus(status) {
     const statusEl = document.getElementById('download-status');
     if (status) statusEl.textContent = status;
+}
+
+/** Drive the overlay's progress bar with a real percentage + message, from
+ * an SSE update tagged 'style_model_download' or 'sdturbo_download'. */
+function updateDownloadProgress(progress, message) {
+    const fillEl = document.getElementById('download-progress-fill');
+    const statusEl = document.getElementById('download-status');
+    if (fillEl && progress !== undefined) {
+        fillEl.style.width = Math.min(Math.max(progress, 0), 100) + '%';
+    }
+    if (statusEl && message) statusEl.textContent = message;
 }
 
 function hideDownloadOverlay() {
@@ -247,7 +260,7 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
 
         // If sd-turbo is not cached, show download overlay
         if (!diffusionCheck.cached) {
-            showDownloadOverlay('Downloading stabilityai/sd-turbo components. This is a one-time download (~2.5GB).');
+            showDownloadOverlay('Downloading stabilityai/sd-turbo components. This is a one-time download (~5GB).');
         }
 
         // Start diagnostics (server will run in background and return a session_id)
@@ -294,7 +307,20 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
             const data = JSON.parse(event.data);
             if (data.keepalive) return;
 
-            // Hide download overlay on first real message (model has loaded)
+            // Model-download progress (style .pkl or the shared sd-turbo
+            // backbone) drives the overlay's real progress bar instead of
+            // the main diagnostics progress bar, and doesn't mean
+            // diagnostics has actually started yet.
+            if (data.type === 'style_model_download' || data.type === 'sdturbo_download') {
+                showDownloadOverlay(data.type === 'sdturbo_download'
+                    ? 'Downloading stabilityai/sd-turbo components. This is a one-time download (~5GB).'
+                    : 'Downloading style model...');
+                updateDownloadProgress(data.progress, data.message);
+                return;
+            }
+
+            // Any other message means real diagnostics progress has begun -
+            // hide the download overlay if it was showing.
             hideDownloadOverlay();
 
             if (data.error) {
@@ -726,7 +752,7 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
         // If sd-turbo is not cached, show download overlay and simulate progress
         // The actual download happens when the model is loaded
         if (!diffusionCheck.cached) {
-            showDownloadOverlay('Downloading stabilityai/sd-turbo components. This is a one-time download (~2.5GB).');
+            showDownloadOverlay('Downloading stabilityai/sd-turbo components. This is a one-time download (~5GB).');
             // Don't await the simulation - let it run in the background
             // The overlay will be hidden when processing starts successfully
         }
@@ -767,7 +793,20 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
                 return;
             }
 
-            // Hide download overlay on first real message (model has loaded)
+            // Model-download progress (style .pkl or the shared sd-turbo
+            // backbone) drives the overlay's real progress bar instead of
+            // the main processing progress bar, and doesn't mean processing
+            // has actually started yet.
+            if (data.type === 'style_model_download' || data.type === 'sdturbo_download') {
+                showDownloadOverlay(data.type === 'sdturbo_download'
+                    ? 'Downloading stabilityai/sd-turbo components. This is a one-time download (~5GB).'
+                    : 'Downloading style model...');
+                updateDownloadProgress(data.progress, data.message);
+                return;
+            }
+
+            // Any other message means real processing progress has begun -
+            // hide the download overlay if it was showing.
             hideDownloadOverlay();
 
             if (data.error) {
@@ -821,6 +860,7 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
                         const img = document.createElement('img');
                         img.src = `/api/get-image/comparisons/${file}`;
                         img.alt = file;
+                        img.onclick = function () { openLightbox(this.src); };
                         galleryDiv.appendChild(img);
                     });
 
@@ -855,10 +895,15 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
     }
 });
 
-// Helper function to show messages
 function showMessage(type, message, container) {
     const messageClass = `message message-${type}`;
-    const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
+    const svgIcons = {
+        success: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: sub; margin-right: 6px;"><polyline points="20 6 9 17 4 12"/></svg>',
+        error: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: sub; margin-right: 6px;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+        warning: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: sub; margin-right: 6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+        info: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: sub; margin-right: 6px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+    };
+    const icon = svgIcons[type] || svgIcons.info;
     container.innerHTML = `<div class="${messageClass}">${icon} ${message}</div>`;
     container.style.display = 'block';
 }
@@ -1008,32 +1053,39 @@ function initImageUpload(areaId, inputId, previewId) {
     }
 }
 
-// Initialize all upload areas on load
+// Initialize all upload areas & Pixel Attention Mode on load
 document.addEventListener('DOMContentLoaded', function () {
     initImageUpload('stats-upload-area', 'stats-image-upload', 'stats-preview');
     initImageUpload('preprocess-upload-area', 'preprocess-image-upload', 'preprocess-preview');
     initImageUpload('diag-upload-area', 'diag-image-upload', 'diag-preview');
     initImageUpload('process-upload-area', 'process-image-upload', 'process-preview');
+
+    // Initialize Pixel Attention Mode for Info Button / Disclaimer
+    initPixelAttention();
 });
 
-// Dark Mode Toggle
-document.getElementById('theme-toggle').addEventListener('click', function () {
-    document.body.classList.toggle('dark-mode');
-    const icon = this.querySelector('.theme-icon');
+function initPixelAttention() {
+    const pixelContainer = document.getElementById('pixel-container');
+    const pixelBubble = document.getElementById('pixel-speech-bubble');
+    const infoBtn = document.getElementById('info-btn');
 
-    if (document.body.classList.contains('dark-mode')) {
-        icon.textContent = '☀️';
-        localStorage.setItem('darkMode', 'enabled');
-    } else {
-        icon.textContent = '🌙';
-        localStorage.setItem('darkMode', 'disabled');
+    if (!pixelContainer || !infoBtn) return;
+
+    // Enable attention mode on launch
+    pixelContainer.classList.add('attention-mode');
+    if (pixelBubble) {
+        pixelBubble.textContent = 'Read Disclaimer! 👉';
     }
-});
+    infoBtn.classList.add('info-pulse-attention');
 
-// Check for saved dark mode preference
-if (localStorage.getItem('darkMode') === 'enabled') {
-    document.body.classList.add('dark-mode');
-    document.querySelector('.theme-icon').textContent = '☀️';
+    // Stop attention mode when user clicks the Info button
+    infoBtn.addEventListener('click', function stopAttention() {
+        pixelContainer.classList.remove('attention-mode');
+        if (pixelBubble) {
+            pixelBubble.textContent = 'Need help?';
+        }
+        infoBtn.classList.remove('info-pulse-attention');
+    });
 }
 
 // Info Modal
@@ -1164,3 +1216,25 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
         btn.innerHTML = '📁 Browse...';
     }
 });
+
+// Copy Citation Helper Function
+function copyCitation() {
+    const citationBox = document.getElementById('citation-text');
+    if (!citationBox) return;
+    const textToCopy = citationBox.innerText || citationBox.textContent;
+    
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        const btn = document.getElementById('copy-citation-btn');
+        if (btn) {
+            btn.classList.add('copied');
+            btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+            setTimeout(() => {
+                btn.classList.remove('copied');
+                btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy Citation';
+            }, 2000);
+        }
+    }).catch(err => {
+        console.error('Failed to copy citation:', err);
+    });
+}
+

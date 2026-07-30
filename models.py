@@ -1,8 +1,15 @@
 import os
 
-# Set Hugging Face cache to local models directory BEFORE importing diffusers/transformers
-# This ensures the sd-turbo model is saved in models/.cache/huggingface instead of global HF cache
-_MODELS_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', '.cache', 'huggingface')
+# Set Hugging Face cache BEFORE importing diffusers/transformers.
+# When launched by the PyPottery Suite launcher, PYPOTTERY_MODEL_CACHE points to a
+# cache dir shared across all suite apps, so a model already downloaded by another
+# app isn't fetched again. Standalone (no launcher), fall back to a self-contained
+# local cache under models/.cache/huggingface, same as before.
+_SUITE_MODEL_CACHE = os.environ.get('PYPOTTERY_MODEL_CACHE')
+if _SUITE_MODEL_CACHE:
+    _MODELS_CACHE_DIR = os.path.join(_SUITE_MODEL_CACHE, 'huggingface')
+else:
+    _MODELS_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', '.cache', 'huggingface')
 os.makedirs(_MODELS_CACHE_DIR, exist_ok=True)
 os.environ['HF_HOME'] = _MODELS_CACHE_DIR
 os.environ['HUGGINGFACE_HUB_CACHE'] = os.path.join(_MODELS_CACHE_DIR, 'hub')

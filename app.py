@@ -14,6 +14,7 @@ import threading
 from queue import Queue
 
 from ink import process_folder, process_single_image
+from models import _MODELS_CACHE_DIR
 from preprocessing import DatasetAnalyzer, apply_recommended_adjustments, check_image_quality
 
 app = Flask(__name__)
@@ -25,7 +26,18 @@ app.config['OUTPUT_FOLDER'] = 'temp_output'
 # Global progress tracking
 progress_queues = {}
 
-version = "2.1.0"
+def _read_version(default: str) -> str:
+    """Read the release version from VERSION (bumped automatically by the
+    auto-release GitHub Action on every release), falling back to `default`
+    for local/dev runs where that file doesn't exist yet."""
+    version_file = Path(__file__).resolve().parent / "VERSION"
+    try:
+        return version_file.read_text(encoding="utf-8").strip() or default
+    except OSError:
+        return default
+
+
+version = _read_version("2.1.0")
 
 # Configuration of models with automatic prompts
 MODELS = {
@@ -72,8 +84,11 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
 
-def download_model(model_name):
-    """Download the selected model if it doesn't already exist"""
+def download_model(model_name, session_id=None):
+    """Download the selected model if it doesn't already exist. If session_id
+    is given and has a live progress queue, real byte progress (we control
+    this download directly, so total/downloaded bytes are always known) is
+    reported into it the same way inference progress is."""
     model_info = MODELS[model_name]
     model_path = os.path.join(MODELS_DIR, model_info["filename"])
 
@@ -85,13 +100,27 @@ def download_model(model_name):
 
             total_size = int(response.headers.get('content-length', 0))
             downloaded = 0
+            last_report_time = 0
 
             with open(model_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
                         downloaded += len(chunk)
-                        
+
+                        if session_id and session_id in progress_queues:
+                            now = time.time()
+                            if now - last_report_time >= 0.15 or downloaded == total_size:
+                                last_report_time = now
+                                pct = (downloaded / total_size * 100) if total_size else 0
+                                mb_down = downloaded / (1024 * 1024)
+                                mb_total = total_size / (1024 * 1024)
+                                progress_queues[session_id].put({
+                                    'type': 'style_model_download',
+                                    'progress': pct,
+                                    'message': f"Downloading {model_name}: {mb_down:.1f} MB / {mb_total:.1f} MB ({pct:.0f}%)"
+                                })
+
             print(f"✅ {model_name} downloaded successfully!")
             return model_path, model_info["prompt"]
         except Exception as e:
@@ -139,29 +168,85 @@ def hardware_check():
         print(f"Hardware check error: {str(e)}")  # Debug log
         return jsonify({"success": False, "error": str(e)}), 500
 
+def _is_sdturbo_cached():
+    """Check if the HF cache (shared across the suite, or local when standalone -
+    see models.py) contains the sd-turbo model files."""
+    cache_dir = os.path.join(_MODELS_CACHE_DIR, 'hub')
+    if not os.path.exists(cache_dir):
+        return False
+    for item in os.listdir(cache_dir):
+        if 'sd-turbo' in item.lower() or 'stabilityai' in item.lower():
+            # Check if it has substantial content (not just refs)
+            item_path = os.path.join(cache_dir, item)
+            if os.path.isdir(item_path):
+                snapshots_dir = os.path.join(item_path, 'snapshots')
+                if os.path.exists(snapshots_dir) and os.listdir(snapshots_dir):
+                    return True
+    return False
+
+
+def _find_sdturbo_blobs_dir():
+    """Locate the sd-turbo cache entry's blobs/ dir (the actual file content -
+    snapshots/ only holds symlinks to these), or None if not created yet."""
+    cache_dir = os.path.join(_MODELS_CACHE_DIR, 'hub')
+    if not os.path.exists(cache_dir):
+        return None
+    for item in os.listdir(cache_dir):
+        if 'sd-turbo' in item.lower():
+            blobs_dir = os.path.join(cache_dir, item, 'blobs')
+            if os.path.isdir(blobs_dir):
+                return blobs_dir
+    return None
+
+
+# huggingface_hub only prints download progress to the console (invisible to
+# the web UI), and from_pretrained() doesn't expose a byte-progress callback.
+# Instead, poll how many bytes have actually landed on disk and compare
+# against this known total (unet + text_encoder + vae fp32 safetensors - no
+# variant="fp16" is requested anywhere, so the fp32 weights are what's
+# downloaded; measured via the HF repo's file listing).
+_SDTURBO_ESTIMATED_TOTAL_BYTES = int(4.95 * 1024 ** 3)
+
+
+def _monitor_sdturbo_download(session_id, stop_event):
+    """Background thread: report sd-turbo download progress into the same
+    SSE queue used for inference progress, tagged so the frontend can tell
+    the two apart. Runs until stop_event is set (model finished loading)."""
+    start_time = time.time()
+    while not stop_event.is_set():
+        blobs_dir = _find_sdturbo_blobs_dir()
+        total_bytes = 0
+        if blobs_dir:
+            for root, _dirs, files in os.walk(blobs_dir):
+                for fname in files:
+                    try:
+                        total_bytes += os.path.getsize(os.path.join(root, fname))
+                    except OSError:
+                        pass
+
+        pct = min(99, int(total_bytes / _SDTURBO_ESTIMATED_TOTAL_BYTES * 100)) if total_bytes else 0
+        gb_down = total_bytes / (1024 ** 3)
+        gb_total = _SDTURBO_ESTIMATED_TOTAL_BYTES / (1024 ** 3)
+        elapsed = max(1.0, time.time() - start_time)
+        speed_mbps = (total_bytes / (1024 * 1024)) / elapsed
+
+        if session_id in progress_queues:
+            progress_queues[session_id].put({
+                'type': 'sdturbo_download',
+                'progress': pct,
+                'message': f"Downloading sd-turbo model: {gb_down:.2f} GB / {gb_total:.2f} GB ({pct}%) - {speed_mbps:.1f} MB/s"
+            })
+        stop_event.wait(0.5)
+
+
 @app.route('/api/check-diffusion-model', methods=['GET'])
 def check_diffusion_model():
     """Check if the sd-turbo diffusion model is already cached locally"""
     try:
-        # Check if the local HF cache contains the sd-turbo model files
-        cache_dir = os.path.join(MODELS_DIR, '.cache', 'huggingface', 'hub')
-        
-        # Look for stabilityai--sd-turbo folder in the cache
-        sd_turbo_cached = False
-        if os.path.exists(cache_dir):
-            for item in os.listdir(cache_dir):
-                if 'sd-turbo' in item.lower() or 'stabilityai' in item.lower():
-                    # Check if it has substantial content (not just refs)
-                    item_path = os.path.join(cache_dir, item)
-                    if os.path.isdir(item_path):
-                        snapshots_dir = os.path.join(item_path, 'snapshots')
-                        if os.path.exists(snapshots_dir) and os.listdir(snapshots_dir):
-                            sd_turbo_cached = True
-                            break
-        
+        cache_dir = os.path.join(_MODELS_CACHE_DIR, 'hub')
         return jsonify({
             "success": True,
-            "cached": sd_turbo_cached,
+            "cached": _is_sdturbo_cached(),
             "cache_dir": cache_dir
         })
     except Exception as e:
@@ -336,36 +421,25 @@ def process_images():
         
         # Create output directory
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Store the output directory in session for image serving
         session['last_output_dir'] = output_dir
-        
-        # Get model path and prompt
-        if model_name == 'custom':
-            # Use custom model from session
-            model_path = session.get('custom_model_path')
-            if not model_path or not os.path.exists(model_path):
-                return jsonify({"success": False, "error": "Custom model not uploaded or not found"}), 400
-            prompt = "enhance pottery drawing for publication"
-        else:
-            model_info = MODELS[model_name]
-            model_path = os.path.join(MODELS_DIR, model_info["filename"])
-            prompt = model_info["prompt"]
 
-            # If the model is not present, attempt to download it (same behavior as batch processing)
-            if not os.path.exists(model_path):
-                downloaded_path, downloaded_prompt = download_model(model_name)
-                if not downloaded_path:
-                    return jsonify({"success": False, "error": "Model not downloaded and download failed"}), 500
-                model_path = downloaded_path
-                # prefer any prompt returned by download_model
-                if downloaded_prompt:
-                    prompt = downloaded_prompt
-        
+        # Custom model path can be resolved now (no download involved); the
+        # preset-model path/prompt (which may require a download) is instead
+        # resolved inside the background thread below, so that download's
+        # progress can be reported over the same SSE channel instead of
+        # blocking this request.
+        custom_model_path = None
+        if model_name == 'custom':
+            custom_model_path = session.get('custom_model_path')
+            if not custom_model_path or not os.path.exists(custom_model_path):
+                return jsonify({"success": False, "error": "Custom model not uploaded or not found"}), 400
+
         # Create a unique session ID for this processing job
         session_id = str(int(time.time() * 1000))
         progress_queues[session_id] = Queue()
-        
+
         # Progress callback function with two progress bars
         def progress_callback(progress, message, patch_progress=None, patch_message=None):
             update = {
@@ -376,40 +450,77 @@ def process_images():
                 update['patch_progress'] = patch_progress * 100
                 update['patch_message'] = patch_message
             progress_queues[session_id].put(update)
-        
+
         # Process folder in background thread
         def process_in_background():
             try:
-                results = process_folder(
-                    input_folder=app.config['UPLOAD_FOLDER'],
-                    model_path=model_path,
-                    prompt=prompt,
-                    output_dir=output_dir,
-                    use_fp16=use_fp16,
-                    contrast_scale=contrast_scale,
-                    patch_size=patch_size,
-                    overlap=overlap,
-                    upscale=upscale,
-                    progress_callback=progress_callback,
-                    export_elements=False,  # Removed SVG export
-                    export_svg=False  # Removed SVG export
-                )
-                
+                if model_name == 'custom':
+                    model_path = custom_model_path
+                    prompt = "enhance pottery drawing for publication"
+                else:
+                    model_info = MODELS[model_name]
+                    model_path = os.path.join(MODELS_DIR, model_info["filename"])
+                    prompt = model_info["prompt"]
+
+                    # If the model is not present, download it here (in the
+                    # background thread) so real progress can stream out.
+                    if not os.path.exists(model_path):
+                        downloaded_path, downloaded_prompt = download_model(model_name, session_id=session_id)
+                        if not downloaded_path:
+                            progress_queues[session_id].put({
+                                'progress': 0,
+                                'message': 'Model not downloaded and download failed',
+                                'error': True
+                            })
+                            return
+                        model_path = downloaded_path
+                        if downloaded_prompt:
+                            prompt = downloaded_prompt
+
+                # sd-turbo (the shared diffusion backbone) downloads lazily
+                # the first time a model is loaded - monitor the HF cache
+                # dir for real progress while process_folder loads it.
+                sdturbo_stop_event = threading.Event()
+                sdturbo_monitor = None
+                if not _is_sdturbo_cached():
+                    sdturbo_monitor = threading.Thread(
+                        target=_monitor_sdturbo_download, args=(session_id, sdturbo_stop_event), daemon=True
+                    )
+                    sdturbo_monitor.start()
+
+                try:
+                    results = process_folder(
+                        input_folder=app.config['UPLOAD_FOLDER'],
+                        model_path=model_path,
+                        prompt=prompt,
+                        output_dir=output_dir,
+                        use_fp16=use_fp16,
+                        contrast_scale=contrast_scale,
+                        patch_size=patch_size,
+                        overlap=overlap,
+                        upscale=upscale,
+                        progress_callback=progress_callback,
+                        export_elements=False,  # Removed SVG export
+                        export_svg=False  # Removed SVG export
+                    )
+                finally:
+                    sdturbo_stop_event.set()
+
                 # Get processed images
                 processed_images = []
                 comparison_images = []
-                
+
                 for file in os.listdir(output_dir):
                     if file.lower().endswith(('.png', '.jpg', '.jpeg')):
                         processed_images.append(file)
-                
+
                 # Check for comparison images
                 comparison_dir = os.path.join(output_dir, 'comparisons')
                 if os.path.exists(comparison_dir):
                     for file in os.listdir(comparison_dir):
                         if file.lower().endswith(('.png', '.jpg', '.jpeg')):
                             comparison_images.append(file)
-                
+
                 # Send final result
                 progress_queues[session_id].put({
                     'progress': 100,
@@ -431,7 +542,7 @@ def process_images():
                     'message': f'Error: {str(e)}',
                     'error': True
                 })
-        
+
         # Start background processing
         thread = threading.Thread(target=process_in_background)
         thread.daemon = True
@@ -500,29 +611,17 @@ def run_diagnostics():
         # Parse contrast values
         contrast_values = [float(x.strip()) for x in contrast_values_str.split(",") if x.strip()]
         
-        # Get model path and prompt
+        # Custom model path can be resolved now (no download involved); the
+        # preset-model path/prompt (which may require a download) is instead
+        # resolved inside the background thread below, so that download's
+        # progress can be reported over the same SSE channel instead of
+        # blocking this request.
+        custom_model_path = None
         if model_name == 'custom':
-            # Use custom model from session
-            model_path = session.get('custom_model_path')
-            if not model_path or not os.path.exists(model_path):
+            custom_model_path = session.get('custom_model_path')
+            if not custom_model_path or not os.path.exists(custom_model_path):
                 return jsonify({"success": False, "error": "Custom model not uploaded or not found"}), 400
-            prompt = "enhance pottery drawing for publication"
-        else:
-            model_info = MODELS[model_name]
-            model_path = os.path.join(MODELS_DIR, model_info["filename"])
-            prompt = model_info["prompt"]
 
-            # If the model is not present, attempt to download it (behaviour like batch processing)
-            if not os.path.exists(model_path):
-                print(f"Model '{model_name}' not found at {model_path}. Attempting to download...")
-                downloaded_path, downloaded_prompt = download_model(model_name)
-                if not downloaded_path:
-                    print(f"Failed to download model: {model_name}")
-                    return jsonify({"success": False, "error": "Model not downloaded and download failed"}), 500
-                model_path = downloaded_path
-                if downloaded_prompt:
-                    prompt = downloaded_prompt
-        
         # Run diagnostics in a background thread and report progress via progress_queues
         from ink import run_diagnostics as ink_run_diagnostics
 
@@ -535,6 +634,31 @@ def run_diagnostics():
 
         def diagnostics_background():
             try:
+                if model_name == 'custom':
+                    model_path = custom_model_path
+                    prompt = "enhance pottery drawing for publication"
+                else:
+                    model_info = MODELS[model_name]
+                    model_path = os.path.join(MODELS_DIR, model_info["filename"])
+                    prompt = model_info["prompt"]
+
+                    # If the model is not present, download it here (in the
+                    # background thread) so real progress can stream out.
+                    if not os.path.exists(model_path):
+                        print(f"Model '{model_name}' not found at {model_path}. Attempting to download...")
+                        downloaded_path, downloaded_prompt = download_model(model_name, session_id=session_id)
+                        if not downloaded_path:
+                            print(f"Failed to download model: {model_name}")
+                            progress_queues[session_id].put({
+                                'progress': 0,
+                                'message': 'Model not downloaded and download failed',
+                                'error': True
+                            })
+                            return
+                        model_path = downloaded_path
+                        if downloaded_prompt:
+                            prompt = downloaded_prompt
+
                 # Notify start
                 progress_queues[session_id].put({
                     'progress': 5,
@@ -549,17 +673,29 @@ def run_diagnostics():
                     except Exception:
                         pass
 
+                # sd-turbo (the shared diffusion backbone) downloads lazily
+                # the first time a model is loaded - monitor the HF cache
+                # dir for real progress while the diagnostics run loads it.
+                sdturbo_stop_event = threading.Event()
+                if not _is_sdturbo_cached():
+                    threading.Thread(
+                        target=_monitor_sdturbo_download, args=(session_id, sdturbo_stop_event), daemon=True
+                    ).start()
+
                 # Run the diagnostics (this may take time) and pass the callback
-                success = ink_run_diagnostics(
-                    input_folder=app.config['UPLOAD_FOLDER'],
-                    model_path=model_path,
-                    prompt=prompt,
-                    patch_size=patch_size,
-                    overlap=overlap,
-                    contrast_values=contrast_values,
-                    output_dir=diagnostics_dir,
-                    progress_callback=progress_cb
-                )
+                try:
+                    success = ink_run_diagnostics(
+                        input_folder=app.config['UPLOAD_FOLDER'],
+                        model_path=model_path,
+                        prompt=prompt,
+                        patch_size=patch_size,
+                        overlap=overlap,
+                        contrast_values=contrast_values,
+                        output_dir=diagnostics_dir,
+                        progress_callback=progress_cb
+                    )
+                finally:
+                    sdturbo_stop_event.set()
 
                 if success:
                     diagnostic_files = []

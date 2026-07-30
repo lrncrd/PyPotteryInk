@@ -54,8 +54,8 @@
                 </div>
                 <div class="header-actions">
                     <a href="https://lrncrd.github.io/PyPottery/pypotteryink/usage.html" target="_blank"
-                        class="pixel-assistant-container" title="Need help?">
-                        <div class="pixel-speech-bubble">Need help?</div>
+                        class="pixel-assistant-container attention-mode" id="pixel-container" title="Need help?">
+                        <div class="pixel-speech-bubble" id="pixel-speech-bubble">Read Disclaimer! 👉</div>
                         <!-- SVG Icon -->
                         <svg width="60" height="60" viewBox="30 45 180 140">
                             <g id="pixel-monitor">
@@ -87,11 +87,8 @@
                             </g>
                         </svg>
                     </a>
-                    <button id="theme-toggle" class="icon-btn" aria-label="Toggle Dark Mode">
-                        <span class="theme-icon">🌙</span>
-                    </button>
                     <button id="info-btn" class="icon-btn" aria-label="About & Info">
-                        <span class="info-icon">ℹ️</span>
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                     </button>
                 </div>
             </div>
@@ -125,44 +122,53 @@
         <div id="info-modal" class="modal" style="display: none;">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>ℹ️ About PyPotteryInk</h2>
-                    <button class="modal-close" id="close-info-modal">&times;</button>
+                    <h2><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary-color);"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>About PyPotteryInk</h2>
+                    <button class="modal-close" id="close-info-modal" aria-label="Close modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="about-centered">
-                        <img src="{{ url_for('static', filename='images/LogoInk.png') }}" alt="PyPotteryInk Logo"
-                            class="about-logo">
-                        <h3>Lorenzo Cardarelli</h3>
-                        <p class="version">v{{ version }}</p>
-
-                        <div class="about-description">
-                            <p>You are using PyPotteryInk version {{ version }}, a Generative AI tool for translating
-                                archaeological pottery drawings into publication-ready illustrations.</p>
-
-                            <div class="disclosure-section">
-                                <h4>DISCLOSURE REQUIREMENT:</h4>
-                                <p>When publishing or presenting results that use PyPotteryInk, please include:</p>
-                                <ol>
-                                    <li>The version of PyPotteryInk used</li>
-                                    <li>The specific model used (e.g., '10k Model' or '6h-MCG Model')</li>
-                                    <li>The number of images processed</li>
-                                </ol>
-
-                                <h4>Suggested citation format:</h4>
-                                <div class="citation-box">
-                                    "This research utilized PyPotteryInk (version {{ version }}) for the AI-assisted<br>
-                                    translation of [number] pottery drawings. PyPotteryInk is a generative AI tool<br>
-                                    developed by Lorenzo Cardarelli (https://github.com/lrncrd/PyPotteryInk)."
-                                </div>
-                            </div>
+                    <div class="about-hero">
+                        <div class="about-logo-wrapper">
+                            <img src="{{ url_for('static', filename='images/LogoInk.png') }}" alt="PyPotteryInk Logo" class="about-logo">
                         </div>
+                        <h3 class="about-author">Lorenzo Cardarelli</h3>
+                        <span class="version-pill">v{{ version }}</span>
+                    </div>
 
-                        <div class="about-links">
-                            <a href="https://github.com/lrncrd/PyPotteryInk" target="_blank"
-                                class="btn btn-primary">GitHub Repository</a>
-                            <a href="https://huggingface.co/lrncrd/PyPotteryInk" target="_blank"
-                                class="btn btn-secondary">HuggingFace Models</a>
+                    <div class="about-description">
+                        <p><strong>PyPotteryInk</strong> is a Generative AI tool designed for translating archaeological pottery drawings into publication-ready illustrations.</p>
+                    </div>
+
+                    <div class="disclosure-section">
+                        <div class="disclosure-header">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            <h4>DISCLOSURE REQUIREMENT</h4>
                         </div>
+                        <p>When publishing or presenting results that use PyPotteryInk, please include:</p>
+                        <ul class="disclosure-list">
+                            <li><span class="list-num">1</span> The version of PyPotteryInk used (e.g. <code>v{{ version }}</code>)</li>
+                            <li><span class="list-num">2</span> The specific model used (e.g. <code>10k Model</code> or <code>6h-MCG Model</code>)</li>
+                            <li><span class="list-num">3</span> The number of images processed</li>
+                        </ul>
+
+                        <div class="citation-header">
+                            <span>Suggested citation format:</span>
+                            <button type="button" id="copy-citation-btn" class="btn-copy-citation" onclick="copyCitation()">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                Copy Citation
+                            </button>
+                        </div>
+                        <div class="citation-box" id="citation-text">"This research utilized PyPotteryInk (version {{ version }}) for the AI-assisted translation of [number] pottery drawings. PyPotteryInk is a generative AI tool developed by Lorenzo Cardarelli (https://github.com/lrncrd/PyPotteryInk)."</div>
+                    </div>
+
+                    <div class="about-links">
+                        <a href="https://github.com/lrncrd/PyPotteryInk" target="_blank" class="about-link-btn primary">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                            GitHub Repository
+                        </a>
+                        <a href="https://huggingface.co/lrncrd/PyPotteryInk" target="_blank" class="about-link-btn secondary">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                            HuggingFace Models
+                        </a>
                     </div>
                 </div>
             </div>
@@ -205,7 +211,7 @@
                     <label>
                         Upload Images to Preprocess:
                         <span class="info-tooltip"
-                            data-tooltip="Upload the images you want to preprocess. The system will analyze each image and apply adjustments based on the statistics to optimize them for AI processing.">ℹ️</span>
+                            data-tooltip="Upload the images you want to preprocess. The system will analyze each image and apply adjustments based on the statistics to optimize them for AI processing."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                     <div class="image-upload-area" id="preprocess-upload-area">
                         <input type="file" id="preprocess-image-upload" multiple accept="image/*"
@@ -223,7 +229,7 @@
                     <label for="stats-file-upload">
                         Upload Statistics File (.npy):
                         <span class="info-tooltip"
-                            data-tooltip="Upload a .npy statistics file. You can use one of the provided statistics files (Montale, Cimino) or create your own in the Advanced section.">ℹ️</span>
+                            data-tooltip="Upload a .npy statistics file. You can use one of the provided statistics files (Montale, Cimino) or create your own in the Advanced section."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                     <input type="file" id="stats-file-upload" accept=".npy" class="file-input">
                 </div>
@@ -232,7 +238,7 @@
                     <label for="preprocess-output-dir">
                         Output Directory:
                         <span class="info-tooltip"
-                            data-tooltip="Folder where the preprocessed images will be saved. Will be created if it doesn't exist.">ℹ️</span>
+                            data-tooltip="Folder where the preprocessed images will be saved. Will be created if it doesn't exist."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                     <div class="input-with-button">
                         <input type="text" id="preprocess-output-dir" value="./preprocessed_images"
@@ -269,7 +275,7 @@
                             <label>
                                 Upload Images for Statistics:
                                 <span class="info-tooltip"
-                                    data-tooltip="Upload a representative sample of your training images. The system will analyze their properties (brightness, contrast, etc.) to create optimal preprocessing parameters.">ℹ️</span>
+                                    data-tooltip="Upload a representative sample of your training images. The system will analyze their properties (brightness, contrast, etc.) to create optimal preprocessing parameters."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                             </label>
                             <div class="image-upload-area" id="stats-upload-area">
                                 <input type="file" id="stats-image-upload" multiple accept="image/*"
@@ -287,7 +293,7 @@
                             <label for="stats-save-path">
                                 Save Statistics As:
                                 <span class="info-tooltip"
-                                    data-tooltip="Path where the calculated statistics will be saved as a .npy file. You can reuse this file later for preprocessing other images.">ℹ️</span>
+                                    data-tooltip="Path where the calculated statistics will be saved as a .npy file. You can reuse this file later for preprocessing other images."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                             </label>
                             <div class="input-with-button">
                                 <input type="text" id="stats-save-path" value="./custom_stats.npy" class="form-control">
@@ -317,7 +323,7 @@
                     <label for="diag-model-select">
                         Select Model:
                         <span class="info-tooltip"
-                            data-tooltip="Choose the AI model optimized for your pottery type. Each model is trained on different archaeological periods and styles.">ℹ️</span>
+                            data-tooltip="Choose the AI model optimized for your pottery type. Each model is trained on different archaeological periods and styles."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                     <select id="diag-model-select" class="form-control">
                         {% for name, info in models.items() %}
@@ -331,7 +337,7 @@
                     <label for="diag-custom-model-file">
                         Upload Custom Model (.pkl):
                         <span class="info-tooltip"
-                            data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture.">ℹ️</span>
+                            data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                     <input type="file" id="diag-custom-model-file" accept=".pkl" class="file-input">
                     <small style="display: block; margin-top: 5px; color: #666;">
@@ -343,7 +349,7 @@
                     <label>
                         Upload Images:
                         <span class="info-tooltip"
-                            data-tooltip="Upload pottery drawings to run diagnostic tests. The system will show you how different parameters affect the output.">ℹ️</span>
+                            data-tooltip="Upload pottery drawings to run diagnostic tests. The system will show you how different parameters affect the output."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                     <div class="image-upload-area" id="diag-upload-area">
                         <input type="file" id="diag-image-upload" multiple accept="image/*" class="file-input-hidden">
@@ -361,7 +367,7 @@
                         <label for="diag-patch-size">
                             Patch Size:
                             <span class="info-tooltip"
-                                data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512">ℹ️</span>
+                                data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                         </label>
                         <input type="number" id="diag-patch-size" value="512" min="256" max="1024" step="64"
                             class="form-control">
@@ -370,7 +376,7 @@
                         <label for="diag-overlap">
                             Overlap:
                             <span class="info-tooltip"
-                                data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64">ℹ️</span>
+                                data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                         </label>
                         <input type="number" id="diag-overlap" value="64" min="0" max="256" step="16"
                             class="form-control">
@@ -381,7 +387,7 @@
                     <label for="diag-contrast">
                         Contrast Test Values:
                         <span class="info-tooltip"
-                            data-tooltip="Comma-separated contrast values to test. The model will generate outputs for each value so you can compare results. Example: 0.75, 1.0, 1.5, 2.0">ℹ️</span>
+                            data-tooltip="Comma-separated contrast values to test. The model will generate outputs for each value so you can compare results. Example: 0.75, 1.0, 1.5, 2.0"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                     <input type="text" id="diag-contrast" value="0.75, 1.0, 1.5, 2.0" class="form-control">
                     <small>Comma-separated values for contrast comparison</small>
@@ -414,7 +420,7 @@
                     <label for="process-model-select">
                         Select Model:
                         <span class="info-tooltip"
-                            data-tooltip="Choose the AI model best suited for your pottery type. Models are specialized for different archaeological periods: Bronze Age, Protohistoric, Historic, or general-purpose.">ℹ️</span>
+                            data-tooltip="Choose the AI model best suited for your pottery type. Models are specialized for different archaeological periods: Bronze Age, Protohistoric, Historic, or general-purpose."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                     <select id="process-model-select" class="form-control">
                         {% for name, info in models.items() %}
@@ -432,7 +438,7 @@
                     <label for="custom-model-file">
                         Upload Custom Model (.pkl):
                         <span class="info-tooltip"
-                            data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture.">ℹ️</span>
+                            data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                     <input type="file" id="custom-model-file" accept=".pkl" class="file-input">
                     <small style="display: block; margin-top: 5px; color: #666;">
@@ -444,7 +450,7 @@
                     <label>
                         Upload Images:
                         <span class="info-tooltip"
-                            data-tooltip="Upload pottery drawings to enhance with AI. All images will be processed in batch. Supports PNG, JPG, and JPEG formats.">ℹ️</span>
+                            data-tooltip="Upload pottery drawings to enhance with AI. All images will be processed in batch. Supports PNG, JPG, and JPEG formats."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                     <div class="image-upload-area" id="process-upload-area">
                         <input type="file" id="process-image-upload" multiple accept="image/*"
@@ -462,7 +468,7 @@
                     <label for="process-output-dir">
                         Output Directory:
                         <span class="info-tooltip"
-                            data-tooltip="Specify the folder where processed images will be saved. Can be an absolute path or relative to the application folder.">ℹ️</span>
+                            data-tooltip="Specify the folder where processed images will be saved. Can be an absolute path or relative to the application folder."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                     <div class="input-with-button">
                         <input type="text" id="process-output-dir" value="./enhanced_pottery" class="form-control"
@@ -480,7 +486,7 @@
                         <label for="process-patch-size">
                             Patch Size:
                             <span class="info-tooltip"
-                                data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512">ℹ️</span>
+                                data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                         </label>
                         <input type="number" id="process-patch-size" value="512" min="256" max="1024" step="64"
                             class="form-control">
@@ -489,7 +495,7 @@
                         <label for="process-overlap">
                             Overlap:
                             <span class="info-tooltip"
-                                data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64">ℹ️</span>
+                                data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                         </label>
                         <input type="number" id="process-overlap" value="64" min="0" max="256" step="16"
                             class="form-control">
@@ -501,7 +507,7 @@
                         <label for="process-contrast">
                             Contrast Scale:
                             <span class="info-tooltip"
-                                data-tooltip="Adjusts input image contrast before AI processing. >1 increases contrast, <1 decreases. Recommended: 1.0">ℹ️</span>
+                                data-tooltip="Adjusts input image contrast before AI processing. >1 increases contrast, <1 decreases. Recommended: 1.0"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                         </label>
                         <input type="number" id="process-contrast" value="1.0" min="0.5" max="3.0" step="0.1"
                             class="form-control">
@@ -510,7 +516,7 @@
                         <label for="process-upscale">
                             Scale Factor:
                             <span class="info-tooltip"
-                                data-tooltip="Scales images before processing. Values > 1 upscale (better quality but slower), values < 1 downscale (faster). Use 1 for original size. Supports decimals (e.g., 0.5, 1.25, 1.75). Range: 0.25-4">ℹ️</span>
+                                data-tooltip="Scales images before processing. Values > 1 upscale (better quality but slower), values < 1 downscale (faster). Use 1 for original size. Supports decimals (e.g., 0.5, 1.25, 1.75). Range: 0.25-4"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                         </label>
                         <input type="number" id="process-upscale" value="1" min="0.25" max="4" step="0.25"
                             class="form-control">
@@ -522,7 +528,7 @@
                         <input type="checkbox" id="use-fp16">
                         Use FP16 (half precision - CUDA only)
                         <span class="info-tooltip"
-                            data-tooltip="Uses 16-bit precision for faster processing on CUDA GPUs. Reduces VRAM usage but may affect quality slightly. Only works on NVIDIA GPUs.">ℹ️</span>
+                            data-tooltip="Uses 16-bit precision for faster processing on CUDA GPUs. Reduces VRAM usage but may affect quality slightly. Only works on NVIDIA GPUs."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
                     </label>
                 </div>
 
