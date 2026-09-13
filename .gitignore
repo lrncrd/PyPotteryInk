@@ -196,3 +196,5 @@ docs
 
 release/
 enhanced_pottery/
+graphify-out/
+static/vendor/

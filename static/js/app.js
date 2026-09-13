@@ -1,5 +1,13 @@
 // PyPotteryInk Flask App - Frontend JavaScript
 
+// GPU-Accelerated Progress Setter (Impeccable 60fps performance without layout thrash)
+function setProgress(el, percent) {
+    if (!el) return;
+    const clamped = Math.min(Math.max(percent, 0), 100);
+    el.style.transform = `scaleX(${clamped / 100})`;
+    el.style.width = '100%';
+}
+
 // Model Download Overlay Helper Functions
 function showDownloadOverlay(message) {
     const overlay = document.getElementById('model-download-overlay');
@@ -9,7 +17,7 @@ function showDownloadOverlay(message) {
 
     if (message) messageEl.textContent = message;
     statusEl.textContent = 'Preparing download...';
-    if (fillEl) fillEl.style.width = '0%';
+    if (fillEl) setProgress(fillEl, 0);
     overlay.classList.add('visible');
 }
 
@@ -24,7 +32,7 @@ function updateDownloadProgress(progress, message) {
     const fillEl = document.getElementById('download-progress-fill');
     const statusEl = document.getElementById('download-status');
     if (fillEl && progress !== undefined) {
-        fillEl.style.width = Math.min(Math.max(progress, 0), 100) + '%';
+        setProgress(fillEl, progress);
     }
     if (statusEl && message) statusEl.textContent = message;
 }
@@ -58,7 +66,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (currentStep < loadingSteps.length) {
             const step = loadingSteps[currentStep];
             progress = step.progress;
-            progressBar.style.width = progress + '%';
+            setProgress(progressBar, progress);
             progressText.textContent = progress + '%';
             splashMessage.textContent = step.message;
             currentStep++;
@@ -113,8 +121,9 @@ document.getElementById('check-hardware-btn').addEventListener('click', async fu
             let html = '<div class="hardware-report">';
 
             // Suitability badge
+            const suitabilityIcon = suitability.icon_class ? `<i class="bi ${suitability.icon_class}"></i>` : '';
             html += `<div class="suitability-badge suitability-${suitability.level}">
-                <span class="emoji">${suitability.emoji}</span>
+                <span class="badge-icon">${suitabilityIcon}</span>
                 <span>${suitability.label}</span>
             </div>`;
 
@@ -124,15 +133,20 @@ document.getElementById('check-hardware-btn').addEventListener('click', async fu
             // Component cards
             html += '<div class="hardware-cards">';
             for (const [key, comp] of Object.entries(components)) {
-                const statusIcon = comp.status === 'excellent' ? '✅' : comp.status === 'adequate' ? '⚠️' : '❌';
+                const statusIcon = comp.status === 'excellent'
+                    ? '<i class="bi bi-check-circle-fill"></i>'
+                    : (comp.status === 'adequate'
+                        ? '<i class="bi bi-exclamation-triangle-fill"></i>'
+                        : '<i class="bi bi-x-circle-fill"></i>');
+                const compIcon = comp.icon_class ? `<i class="bi ${comp.icon_class}"></i>` : '';
                 html += `<div class="hardware-card">
                     <div class="hardware-card-header">
-                        <span class="hardware-card-icon">${comp.icon}</span>
+                        <span class="hardware-card-icon">${compIcon}</span>
                         <span class="hardware-card-title">${comp.name}</span>
                     </div>
                     <div class="hardware-card-value">${comp.value}</div>
                     <div class="hardware-card-status status-${comp.status}">
-                        ${statusIcon} ${comp.message}
+                        ${statusIcon} <span>${comp.message}</span>
                     </div>
                 </div>`;
             }
@@ -140,7 +154,7 @@ document.getElementById('check-hardware-btn').addEventListener('click', async fu
 
             // Tips
             if (tips.length > 0) {
-                html += '<div class="hardware-tips"><h4>💡 Tips</h4><ul>';
+                html += '<div class="hardware-tips"><h4><i class="bi bi-lightbulb-fill"></i> Tips</h4><ul>';
                 tips.forEach(tip => {
                     html += `<li>${tip}</li>`;
                 });
@@ -158,7 +172,7 @@ document.getElementById('check-hardware-btn').addEventListener('click', async fu
         showMessage('error', 'Error: ' + error.message, reportContainer);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<span>🔍</span> Check Hardware';
+        btn.innerHTML = '<i class="bi bi-search"></i> Check Hardware';
     }
 });
 
@@ -284,7 +298,7 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
         if (resp.success && resp.diagnostic_files) {
             showDiagnosticsComplete(resp.diagnostic_files, outputContainer, gallery);
             btn.disabled = false;
-            btn.innerHTML = '<span>🚀</span> Run Diagnostics';
+            btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Run Diagnostics';
             return;
         }
 
@@ -298,7 +312,7 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
         const statusText = document.getElementById('diag-status');
 
         progressContainer.style.display = 'block';
-        progressFill.style.width = '5%';
+        setProgress(progressFill, 5);
         statusText.textContent = 'Starting diagnostics...';
 
         const eventSource = new EventSource(`/api/progress/${sessionId}`);
@@ -327,13 +341,13 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
                 showMessage('error', data.message || 'Diagnostics error', outputContainer);
                 eventSource.close();
                 btn.disabled = false;
-                btn.innerHTML = '<span>🚀</span> Run Diagnostics';
+                btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Run Diagnostics';
                 return;
             }
 
             if (data.progress !== undefined) {
                 const progress = Math.min(Math.max(data.progress, 0), 100);
-                progressFill.style.width = progress + '%';
+                setProgress(progressFill, progress);
                 statusText.textContent = data.message || 'Running diagnostics...';
             }
 
@@ -344,8 +358,8 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
                 showDiagnosticsComplete(files, outputContainer, gallery);
 
                 btn.disabled = false;
-                btn.innerHTML = '<span>🚀</span> Run Diagnostics';
-                progressFill.style.width = '100%';
+                btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Run Diagnostics';
+                setProgress(progressFill, 100);
                 statusText.textContent = 'Completed';
             }
         };
@@ -354,21 +368,21 @@ document.getElementById('run-diagnostics-btn').addEventListener('click', async f
             eventSource.close();
             showMessage('error', 'Connection lost. Diagnostics may still continue in background.', outputContainer);
             btn.disabled = false;
-            btn.innerHTML = '<span>🚀</span> Run Diagnostics';
+            btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Run Diagnostics';
             progressContainer.style.display = 'none';
         };
     } catch (error) {
         showMessage('error', 'Error: ' + error.message, outputContainer);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<span>🚀</span> Run Diagnostics';
+        btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Run Diagnostics';
     }
 });
 
 // Helper function to show diagnostics complete with open folder button
 function showDiagnosticsComplete(files, outputContainer, gallery) {
-    let html = `<div class="message message-success">✅ Diagnostics completed! Generated ${files.length} visualizations.</div>`;
-    html += `<button class="btn btn-open-folder" onclick="openDiagnosticsFolder()">📁 Open Diagnostics Folder</button>`;
+    let html = `<div class="message message-success"><i class="bi bi-check-circle-fill"></i> Diagnostics completed! Generated ${files.length} visualizations.</div>`;
+    html += `<button class="btn btn-open-folder" onclick="openDiagnosticsFolder()"><i class="bi bi-folder2-open"></i> Open Diagnostics Folder</button>`;
     outputContainer.innerHTML = html;
     outputContainer.style.display = 'block';
 
@@ -468,7 +482,7 @@ document.getElementById('calculate-stats-btn').addEventListener('click', async f
         const data = await statsResponse.json();
 
         if (data.success) {
-            let html = '<div class="message message-success">✅ Statistics calculated successfully!</div>';
+            let html = '<div class="message message-success"><i class="bi bi-check-circle-fill"></i> Statistics calculated successfully!</div>';
             html += `<p><strong>Images analyzed:</strong> ${data.summary.images_analyzed}</p>`;
             html += `<p><strong>Statistics file:</strong> ${data.summary.statistics_file}</p>`;
             html += '<h4>Distributions:</h4><table style="width: 100%; border-collapse: collapse;">';
@@ -495,7 +509,7 @@ document.getElementById('calculate-stats-btn').addEventListener('click', async f
         showMessage('error', 'Error: ' + error.message, outputContainer);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<span>📊</span> Calculate Statistics';
+        btn.innerHTML = '<i class="bi bi-bar-chart-line"></i> Calculate Statistics';
     }
 });
 
@@ -571,7 +585,7 @@ document.getElementById('preprocess-btn').addEventListener('click', async functi
         if (respData.success && respData.processed !== undefined) {
             console.log('Server returned direct results (no SSE).');
             const html = `
-                <div class="message message-success">✅ Preprocessing completed!</div>
+                <div class="message message-success"><i class="bi bi-check-circle-fill"></i> Preprocessing completed!</div>
                 <p><strong>Total processed:</strong> ${respData.processed}</p>
                 <p><strong>Images adjusted:</strong> ${respData.adjusted}</p>
                 <p><strong>No adjustments needed:</strong> ${respData.processed - respData.adjusted}</p>
@@ -580,7 +594,7 @@ document.getElementById('preprocess-btn').addEventListener('click', async functi
             outputContainer.innerHTML = html;
             outputContainer.style.display = 'block';
             btn.disabled = false;
-            btn.innerHTML = '<span>✨</span> Apply Preprocessing';
+            btn.innerHTML = '<i class="bi bi-stars"></i> Apply Preprocessing';
             return;
         }
 
@@ -595,7 +609,7 @@ document.getElementById('preprocess-btn').addEventListener('click', async functi
         const statusText = document.getElementById('preprocess-status');
 
         progressContainer.style.display = 'block';
-        progressFill.style.width = '5%';
+        setProgress(progressFill, 5);
         statusText.textContent = 'Starting preprocessing...';
 
         const eventSource = new EventSource(`/api/progress/${sessionId}`);
@@ -609,13 +623,13 @@ document.getElementById('preprocess-btn').addEventListener('click', async functi
                 showMessage('error', data.message || 'Preprocessing error', outputContainer);
                 eventSource.close();
                 btn.disabled = false;
-                btn.innerHTML = '<span>✨</span> Apply Preprocessing';
+                btn.innerHTML = '<i class="bi bi-stars"></i> Apply Preprocessing';
                 return;
             }
 
             if (data.progress !== undefined) {
                 const progress = Math.min(Math.max(data.progress, 0), 100);
-                progressFill.style.width = progress + '%';
+                setProgress(progressFill, progress);
                 statusText.textContent = data.message || 'Processing...';
             }
 
@@ -624,7 +638,7 @@ document.getElementById('preprocess-btn').addEventListener('click', async functi
 
                 const results = data.results;
                 const html = `
-                    <div class="message message-success">✅ Preprocessing completed!</div>
+                    <div class="message message-success"><i class="bi bi-check-circle-fill"></i> Preprocessing completed!</div>
                     <p><strong>Total processed:</strong> ${results.processed}</p>
                     <p><strong>Images adjusted:</strong> ${results.adjusted}</p>
                     <p><strong>No adjustments needed:</strong> ${results.processed - results.adjusted}</p>
@@ -636,8 +650,8 @@ document.getElementById('preprocess-btn').addEventListener('click', async functi
 
                 // Reset button
                 btn.disabled = false;
-                btn.innerHTML = '<span>✨</span> Apply Preprocessing';
-                progressFill.style.width = '100%';
+                btn.innerHTML = '<i class="bi bi-stars"></i> Apply Preprocessing';
+                setProgress(progressFill, 100);
                 statusText.textContent = 'Completed';
             }
         };
@@ -646,14 +660,14 @@ document.getElementById('preprocess-btn').addEventListener('click', async functi
             eventSource.close();
             showMessage('error', 'Connection lost. Preprocessing may still continue in background.', outputContainer);
             btn.disabled = false;
-            btn.innerHTML = '<span>✨</span> Apply Preprocessing';
+            btn.innerHTML = '<i class="bi bi-stars"></i> Apply Preprocessing';
             progressContainer.style.display = 'none';
         };
     } catch (error) {
         showMessage('error', 'Error: ' + error.message, outputContainer);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<span>✨</span> Apply Preprocessing';
+        btn.innerHTML = '<i class="bi bi-stars"></i> Apply Preprocessing';
     }
 });
 
@@ -687,8 +701,8 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
         // Upload images
         statusText.textContent = 'Uploading images...';
         patchStatusText.textContent = 'Waiting...';
-        progressFill.style.width = '5%';
-        patchProgressFill.style.width = '0%';
+        setProgress(progressFill, 5);
+        setProgress(patchProgressFill, 0);
 
         const formData = new FormData();
         Array.from(files).forEach(file => formData.append('files', file));
@@ -708,7 +722,7 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
             }
 
             statusText.textContent = 'Uploading custom model...';
-            progressFill.style.width = '8%';
+            setProgress(progressFill, 8);
 
             const modelFormData = new FormData();
             modelFormData.append('model', customModelFile);
@@ -726,7 +740,7 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
 
         // Check and download model if needed (for non-custom models)
         statusText.textContent = 'Checking model...';
-        progressFill.style.width = '10%';
+        setProgress(progressFill, 10);
 
         // Only check model if not custom
         if (modelName !== 'custom') {
@@ -744,7 +758,7 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
 
         // Check if diffusion model (sd-turbo) is cached
         statusText.textContent = 'Checking diffusion model...';
-        progressFill.style.width = '12%';
+        setProgress(progressFill, 12);
 
         const diffusionCheckResponse = await fetch('/api/check-diffusion-model');
         const diffusionCheck = await diffusionCheckResponse.json();
@@ -759,7 +773,7 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
 
         // Start processing
         statusText.textContent = 'Starting processing...';
-        progressFill.style.width = '15%';
+        setProgress(progressFill, 15);
 
         const processResponse = await fetch('/api/process-images', {
             method: 'POST',
@@ -813,21 +827,21 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
                 showMessage('error', data.message, outputContainer);
                 eventSource.close();
                 btn.disabled = false;
-                btn.innerHTML = '<span>🚀</span> Start Processing';
+                btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Start Processing';
                 return;
             }
 
             // Update overall progress bar and status
             if (data.progress !== undefined) {
                 const progress = Math.min(Math.max(data.progress, 0), 100);
-                progressFill.style.width = progress + '%';
+                setProgress(progressFill, progress);
                 statusText.textContent = data.message || 'Processing...';
             }
 
             // Update patch progress bar and status
             if (data.patch_progress !== undefined) {
                 const patchProgress = Math.min(Math.max(data.patch_progress, 0), 100);
-                patchProgressFill.style.width = patchProgress + '%';
+                setProgress(patchProgressFill, patchProgress);
                 patchStatusText.textContent = data.patch_message || 'Processing patches...';
             }
 
@@ -836,15 +850,15 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
                 eventSource.close();
 
                 const results = data.results;
-                let html = '<div class="message message-success">🎉 Processing completed successfully!</div>';
+                let html = '<div class="message message-success"><i class="bi bi-check-circle-fill"></i> Processing completed successfully!</div>';
                 html += '<h3>Results Summary:</h3>';
-                html += `<p><strong>✅ Successful:</strong> ${results.successful} images</p>`;
-                html += `<p><strong>❌ Failed:</strong> ${results.failed} images</p>`;
-                html += `<p><strong>⏱️ Average time:</strong> ${results.average_time.toFixed(2)}s per image</p>`;
-                html += `<p><strong>📁 Output directory:</strong> <code>${results.output_dir}</code></p>`;
+                html += `<p><strong><i class="bi bi-check-circle-fill" style="color: var(--teal);"></i> Successful:</strong> ${results.successful} images</p>`;
+                html += `<p><strong><i class="bi bi-x-circle-fill" style="color: var(--danger-color);"></i> Failed:</strong> ${results.failed} images</p>`;
+                html += `<p><strong><i class="bi bi-stopwatch"></i> Average time:</strong> ${results.average_time.toFixed(2)}s per image</p>`;
+                html += `<p><strong><i class="bi bi-folder2-open"></i> Output directory:</strong> <code>${results.output_dir}</code></p>`;
 
                 if (results.log_file) {
-                    html += `<p><strong>📝 Log file:</strong> <code>${results.log_file}</code></p>`;
+                    html += `<p><strong><i class="bi bi-file-earmark-text"></i> Log file:</strong> <code>${results.log_file}</code></p>`;
                 }
 
                 outputContainer.innerHTML = html;
@@ -876,7 +890,7 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
                 }
 
                 btn.disabled = false;
-                btn.innerHTML = '<span>🚀</span> Start Processing';
+                btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Start Processing';
             }
         };
 
@@ -884,27 +898,27 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
             eventSource.close();
             showMessage('error', 'Connection lost. Processing may still continue in background.', outputContainer);
             btn.disabled = false;
-            btn.innerHTML = '<span>🚀</span> Start Processing';
+            btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Start Processing';
         };
 
     } catch (error) {
         showMessage('error', 'Error: ' + error.message, outputContainer);
         btn.disabled = false;
-        btn.innerHTML = '<span>🚀</span> Start Processing';
+        btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Start Processing';
         progressContainer.style.display = 'none';
     }
 });
 
 function showMessage(type, message, container) {
     const messageClass = `message message-${type}`;
-    const svgIcons = {
-        success: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: sub; margin-right: 6px;"><polyline points="20 6 9 17 4 12"/></svg>',
-        error: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: sub; margin-right: 6px;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
-        warning: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: sub; margin-right: 6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-        info: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: sub; margin-right: 6px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+    const icons = {
+        success: '<i class="bi bi-check-circle-fill"></i>',
+        error: '<i class="bi bi-x-circle-fill"></i>',
+        warning: '<i class="bi bi-exclamation-triangle-fill"></i>',
+        info: '<i class="bi bi-info-circle-fill"></i>'
     };
-    const icon = svgIcons[type] || svgIcons.info;
-    container.innerHTML = `<div class="${messageClass}">${icon} ${message}</div>`;
+    const icon = icons[type] || icons.info;
+    container.innerHTML = `<div class="${messageClass}">${icon} <span>${message}</span></div>`;
     container.style.display = 'block';
 }
 
@@ -989,11 +1003,11 @@ function initImageUpload(areaId, inputId, previewId) {
                 // Show placeholder for TIFF files
                 previewItem.innerHTML = `
                     <div class="tiff-placeholder">
-                        <div class="tiff-icon">🖼️</div>
+                        <div class="tiff-icon"><i class="bi bi-file-earmark-image"></i></div>
                         <div class="tiff-label">TIFF</div>
                     </div>
                     <div class="preview-item-name">${file.name}</div>
-                    <button class="preview-item-remove" data-index="${index}">×</button>
+                    <button class="preview-item-remove" data-index="${index}" aria-label="Remove image"><i class="bi bi-x"></i></button>
                 `;
                 previewContainer.appendChild(previewItem);
 
@@ -1009,7 +1023,7 @@ function initImageUpload(areaId, inputId, previewId) {
                     previewItem.innerHTML = `
                         <img src="${e.target.result}" alt="${file.name}">
                         <div class="preview-item-name">${file.name}</div>
-                        <button class="preview-item-remove" data-index="${index}">×</button>
+                        <button class="preview-item-remove" data-index="${index}" aria-label="Remove image"><i class="bi bi-x"></i></button>
                     `;
                     previewContainer.appendChild(previewItem);
 
@@ -1074,7 +1088,7 @@ function initPixelAttention() {
     // Enable attention mode on launch
     pixelContainer.classList.add('attention-mode');
     if (pixelBubble) {
-        pixelBubble.textContent = 'Read Disclaimer! 👉';
+        pixelBubble.innerHTML = 'Read Disclaimer! <i class="bi bi-arrow-right-short"></i>';
     }
     infoBtn.classList.add('info-pulse-attention');
 
@@ -1154,7 +1168,7 @@ document.getElementById('browse-output-dir').addEventListener('click', async fun
         alert('Error opening directory picker: ' + error.message);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '📁 Browse...';
+        btn.innerHTML = '<i class="bi bi-folder2-open"></i> Browse...';
     }
 });
 
@@ -1183,7 +1197,7 @@ document.getElementById('browse-preprocess-dir').addEventListener('click', async
         alert('Error opening directory picker: ' + error.message);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '📁 Browse...';
+        btn.innerHTML = '<i class="bi bi-folder2-open"></i> Browse...';
     }
 });
 
@@ -1213,7 +1227,7 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
         alert('Error opening directory picker: ' + error.message);
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '📁 Browse...';
+        btn.innerHTML = '<i class="bi bi-folder2-open"></i> Browse...';
     }
 });
 
@@ -1227,10 +1241,10 @@ function copyCitation() {
         const btn = document.getElementById('copy-citation-btn');
         if (btn) {
             btn.classList.add('copied');
-            btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+            btn.innerHTML = '<i class="bi bi-check2"></i> Copied!';
             setTimeout(() => {
                 btn.classList.remove('copied');
-                btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy Citation';
+                btn.innerHTML = '<i class="bi bi-clipboard"></i> Copy Citation';
             }, 2000);
         }
     }).catch(err => {

@@ -137,7 +137,8 @@ class HardwareChecker:
         
         self.components["gpu"] = {
             "name": "GPU",
-            "icon": "🎮",
+            "icon": "",
+            "icon_class": "bi-gpu-card",
             "value": self.info["gpu"],
             "status": gpu_status,
             "message": gpu_message
@@ -157,7 +158,8 @@ class HardwareChecker:
         
         self.components["ram"] = {
             "name": "RAM",
-            "icon": "💾",
+            "icon": "",
+            "icon_class": "bi-memory",
             "value": self.info["ram"],
             "status": ram_status,
             "message": ram_message
@@ -167,10 +169,7 @@ class HardwareChecker:
         cpu_cores = self.info["cpu_cores"]
         cpu_brand = self.info["cpu_brand"]
         
-        # Check for Apple Silicon
         apple_silicon = "apple" in cpu_brand or "m1" in cpu_brand or "m2" in cpu_brand or "m3" in cpu_brand or "m4" in cpu_brand
-        
-        # Check for modern CPUs
         modern_cpu = any(brand in cpu_brand for brand in ["intel", "amd"]) and \
                      any(gen in cpu_brand for gen in ["i5", "i7", "i9", "ryzen 5", "ryzen 7", "ryzen 9"])
         
@@ -183,6 +182,9 @@ class HardwareChecker:
         elif modern_cpu and cpu_cores >= 4:
             cpu_status = STATUS_ADEQUATE
             cpu_message = f"Modern processor with {cpu_cores} cores"
+        elif cpu_cores >= 8:
+            cpu_status = STATUS_EXCELLENT
+            cpu_message = f"High-performance processor with {cpu_cores} cores"
         elif cpu_cores >= 4:
             cpu_status = STATUS_ADEQUATE
             cpu_message = f"Processor with {cpu_cores} cores"
@@ -192,7 +194,8 @@ class HardwareChecker:
         
         self.components["cpu"] = {
             "name": "CPU",
-            "icon": "🖥️",
+            "icon": "",
+            "icon_class": "bi-cpu",
             "value": self.info["cpu"],
             "status": cpu_status,
             "message": cpu_message
@@ -214,14 +217,15 @@ class HardwareChecker:
         
         self.components["disk"] = {
             "name": "Storage",
-            "icon": "💿",
+            "icon": "",
+            "icon_class": "bi-hdd",
             "value": self.info["disk_speed"],
             "status": disk_status,
             "message": disk_message
         }
 
-    def get_suitability(self) -> Tuple[str, str, str]:
-        """Returns overall suitability level, label and emoji"""
+    def get_suitability(self) -> Tuple[str, str, str, str]:
+        """Returns overall suitability level, label, emoji, and Bootstrap icon class"""
         gpu_status = self.components["gpu"]["status"]
         
         # Count status levels
@@ -230,38 +234,40 @@ class HardwareChecker:
         all_excellent = all(s == STATUS_EXCELLENT for s in statuses)
         
         if gpu_status == STATUS_LIMITED:
-            return SUITABILITY_NOT_RECOMMENDED, "Not Recommended", "🔴"
+            return SUITABILITY_NOT_RECOMMENDED, "Not Recommended", "", "bi-x-circle-fill"
         elif has_limited:
-            return SUITABILITY_LIMITED_USE, "Limited Use", "🟡"
+            return SUITABILITY_LIMITED_USE, "Limited Use", "", "bi-exclamation-triangle-fill"
         elif all_excellent or gpu_status == STATUS_EXCELLENT:
-            return SUITABILITY_HIGHLY_RECOMMENDED, "Highly Recommended", "🟢"
+            return SUITABILITY_HIGHLY_RECOMMENDED, "Highly Recommended", "", "bi-check-circle-fill"
         else:
-            return SUITABILITY_RECOMMENDED, "Recommended", "🟠"
+            return SUITABILITY_RECOMMENDED, "Recommended", "", "bi-check-circle"
 
     def get_structured_report(self) -> Dict[str, Any]:
         """Returns structured report as dictionary for JSON serialization"""
-        suitability_level, suitability_label, suitability_emoji = self.get_suitability()
+        suitability_level, suitability_label, suitability_emoji, suitability_icon = self.get_suitability()
         
         # Generate conclusion message
         if suitability_level == SUITABILITY_HIGHLY_RECOMMENDED:
-            conclusion = "Your hardware is excellent for PyPotteryInk!"
+            conclusion = "Your system exceeds all requirements. PyPotteryInk will run at peak performance."
         elif suitability_level == SUITABILITY_RECOMMENDED:
-            conclusion = "Your hardware is adequate for PyPotteryInk."
+            conclusion = "Your system meets recommended specifications. Excellent performance expected."
         elif suitability_level == SUITABILITY_LIMITED_USE:
-            conclusion = "Your hardware can run PyPotteryInk but may have performance limitations."
+            conclusion = "Your system meets minimum requirements. Processing will work but may be slower."
         else:
-            conclusion = "Your hardware is not recommended. Processing may be very slow."
+            conclusion = "Your system does not meet minimum requirements. Processing may be extremely slow or fail."
         
         return {
             "suitability": {
                 "level": suitability_level,
                 "label": suitability_label,
                 "emoji": suitability_emoji,
+                "icon_class": suitability_icon,
                 "conclusion": conclusion
             },
             "components": self.components,
             "tips": [
-                "Keep laptop well ventilated and connected to power during processing",
+                "Use patch size 512 for optimal balance of speed and quality",
+                "Enable FP16 if you have a CUDA-compatible GPU",
                 "Close other applications to maximize available memory"
             ]
         }
@@ -270,12 +276,12 @@ class HardwareChecker:
         """Generates a complete report in markdown (legacy support)"""
         structured = self.get_structured_report()
         
-        report = f"## {structured['suitability']['emoji']} {structured['suitability']['label']}\n\n"
+        report = f"## {structured['suitability']['label']}\n\n"
         report += f"{structured['suitability']['conclusion']}\n\n"
         
-        report += "## 🖥️ Hardware Specifications\n"
+        report += "## Hardware Specifications\n"
         for key, comp in structured['components'].items():
-            status_icon = "✅" if comp['status'] == STATUS_EXCELLENT else "⚠️" if comp['status'] == STATUS_ADEQUATE else "❌"
+            status_icon = "[OK]" if comp['status'] == STATUS_EXCELLENT else "[WARNING]" if comp['status'] == STATUS_ADEQUATE else "[FAIL]"
             report += f"- **{comp['name']}:** {comp['value']} {status_icon}\n"
         
         return report

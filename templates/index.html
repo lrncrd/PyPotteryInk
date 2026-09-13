@@ -4,24 +4,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PyPotteryInk - Archaeological Pottery Enhancement Tool</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>PyPotteryInk — Archaeological Pottery Enhancement Tool</title>
+    <meta name="description" content="PyPotteryInk - AI-assisted digital inking of ceramic pencil drawings yielding publication-quality line art">
+    <meta name="theme-color" content="#fbf9f5">
+
+    <!-- Local Offline Vendor Assets with CDN Fallback -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fonts/fonts.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ version }}">
 </head>
 
 <body>
-    <!-- Splash Screen -->
+    <!-- Splash Screen - Archaeological Field Desk & Drafting Grid -->
     <div id="splash-screen" class="splash-screen">
         <div class="splash-content">
-            <img src="{{ url_for('static', filename='images/LogoInk.png') }}" alt="PyPotteryInk Logo"
-                class="splash-logo">
+            <img src="{{ url_for('static', filename='images/LogoInk.png') }}" alt="PyPotteryInk Logo" class="splash-logo">
             <div class="splash-spinner"></div>
-            <h1 class="splash-title">PyPotteryInk</h1>
+            <h1 class="splash-title">PyPottery<span class="splash-accent">Ink</span></h1>
             <p class="splash-message" id="splash-message">Initializing application...</p>
 
             <div class="splash-progress">
-                <div class="splash-progress-bar" id="splash-progress-bar" style="width: 0%">
-                    <span id="splash-progress-text">0%</span>
-                </div>
+                <div class="splash-progress-bar" id="splash-progress-bar"></div>
+                <span class="splash-progress-text" id="splash-progress-text">0%</span>
             </div>
         </div>
     </div>
@@ -29,10 +36,11 @@
     <!-- Model Download Overlay -->
     <div id="model-download-overlay" class="model-download-overlay">
         <div class="model-download-content">
-            <div class="download-icon">📥</div>
-            <h3>Downloading Diffusion Model...</h3>
-            <p id="download-message">Downloading stabilityai/sd-turbo components. This may take a few minutes on first
-                run.</p>
+            <div class="download-icon">
+                <i class="bi bi-cloud-arrow-down-fill"></i>
+            </div>
+            <h2 class="download-title">Downloading Diffusion Model...</h2>
+            <p id="download-message">Downloading stabilityai/sd-turbo components. This may take a few minutes on first run.</p>
             <div class="download-progress-bar">
                 <div class="download-progress-fill" id="download-progress-fill"></div>
             </div>
@@ -46,18 +54,17 @@
         <header class="app-header">
             <div class="header-top">
                 <div class="logo-section">
-                    <img src="{{ url_for('static', filename='images/LogoInk.png') }}" alt="PyPotteryInk Logo"
-                        class="logo">
+                    <img src="{{ url_for('static', filename='images/LogoInk.png') }}" alt="PyPotteryInk Logo" class="logo">
                     <div>
                         <h1>PyPotteryInk <span class="version-badge">v{{ version }}</span></h1>
                     </div>
                 </div>
                 <div class="header-actions">
                     <a href="https://lrncrd.github.io/PyPottery/pypotteryink/usage.html" target="_blank"
-                        class="pixel-assistant-container attention-mode" id="pixel-container" title="Need help?">
-                        <div class="pixel-speech-bubble" id="pixel-speech-bubble">Read Disclaimer! 👉</div>
+                        class="pixel-assistant-container attention-mode" id="pixel-container" title="Need help? Read documentation & disclaimer">
+                        <div class="pixel-speech-bubble" id="pixel-speech-bubble">Read Disclaimer! <i class="bi bi-arrow-right-short"></i></div>
                         <!-- SVG Icon -->
-                        <svg width="60" height="60" viewBox="30 45 180 140">
+                        <svg width="60" height="60" viewBox="30 45 180 140" aria-hidden="true">
                             <g id="pixel-monitor">
                                 <!-- Monitor Body -->
                                 <rect x="40" y="50" width="160" height="130" rx="15" ry="15" fill="#d0d0d0"
@@ -87,43 +94,42 @@
                             </g>
                         </svg>
                     </a>
-                    <button id="info-btn" class="icon-btn" aria-label="About & Info">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                    <button id="info-btn" class="icon-btn" aria-label="About & Info" title="About & Info">
+                        <i class="bi bi-info-circle"></i>
                     </button>
                 </div>
             </div>
             <div class="header-subtitle">
-                A deep learning Python package for automating the digital inking process of archaeological pottery
-                drawings
+                A deep learning tool for automating the digital inking process of archaeological pottery drawings
             </div>
         </header>
 
         <!-- Tab Navigation -->
         <div class="tab-navigation">
             <button class="tab-button active" data-tab="hardware-tab">
-                <span class="tab-icon">⚙️</span>
+                <i class="bi bi-cpu"></i>
                 <span class="tab-label">Hardware Check</span>
             </button>
             <button class="tab-button" data-tab="preprocessing-tab">
-                <span class="tab-icon">📊</span>
+                <i class="bi bi-sliders"></i>
                 <span class="tab-label">Preprocessing</span>
             </button>
             <button class="tab-button" data-tab="diagnostics-tab">
-                <span class="tab-icon">🔍</span>
+                <i class="bi bi-search"></i>
                 <span class="tab-label">Model Diagnostics</span>
             </button>
             <button class="tab-button" data-tab="processing-tab">
-                <span class="tab-icon">🎨</span>
+                <i class="bi bi-palette"></i>
                 <span class="tab-label">Batch Processing</span>
             </button>
         </div>
 
         <!-- Info Modal -->
-        <div id="info-modal" class="modal" style="display: none;">
+        <div id="info-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="about-modal-title">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--primary-color);"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>About PyPotteryInk</h2>
-                    <button class="modal-close" id="close-info-modal" aria-label="Close modal">&times;</button>
+                    <h2 id="about-modal-title"><i class="bi bi-info-circle-fill" style="color: var(--primary);"></i> About PyPotteryInk</h2>
+                    <button class="modal-close" id="close-info-modal" aria-label="Close modal"><i class="bi bi-x-lg"></i></button>
                 </div>
                 <div class="modal-body">
                     <div class="about-hero">
@@ -140,7 +146,7 @@
 
                     <div class="disclosure-section">
                         <div class="disclosure-header">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            <i class="bi bi-shield-check"></i>
                             <h4>DISCLOSURE REQUIREMENT</h4>
                         </div>
                         <p>When publishing or presenting results that use PyPotteryInk, please include:</p>
@@ -153,7 +159,7 @@
                         <div class="citation-header">
                             <span>Suggested citation format:</span>
                             <button type="button" id="copy-citation-btn" class="btn-copy-citation" onclick="copyCitation()">
-                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                <i class="bi bi-clipboard"></i>
                                 Copy Citation
                             </button>
                         </div>
@@ -161,12 +167,12 @@
                     </div>
 
                     <div class="about-links">
-                        <a href="https://github.com/lrncrd/PyPotteryInk" target="_blank" class="about-link-btn primary">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                        <a href="https://github.com/lrncrd/PyPotteryInk" target="_blank" rel="noopener noreferrer" class="about-link-btn primary">
+                            <i class="bi bi-github"></i>
                             GitHub Repository
                         </a>
-                        <a href="https://huggingface.co/lrncrd/PyPotteryInk" target="_blank" class="about-link-btn secondary">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                        <a href="https://huggingface.co/lrncrd/PyPotteryInk" target="_blank" rel="noopener noreferrer" class="about-link-btn secondary">
+                            <i class="bi bi-box-arrow-up-right"></i>
                             HuggingFace Models
                         </a>
                     </div>
@@ -177,20 +183,19 @@
         <!-- Tab 1: Hardware Check -->
         <div class="tab-content active" id="hardware-tab">
             <div class="panel">
-                <h2>🖥️ System Requirements Check</h2>
-                <p class="info-text">This tool requires significant computational resources. Please verify your hardware
-                    meets the requirements.</p>
+                <h2><i class="bi bi-display"></i> System Requirements Check</h2>
+                <p class="info-text">This tool requires significant computational resources. Please verify that your local hardware meets the scientific processing requirements.</p>
 
                 <button id="check-hardware-btn" class="btn btn-primary">
-                    <span>🔍</span> Check Hardware
+                    <i class="bi bi-search"></i> Check Hardware
                 </button>
 
                 <div id="hardware-report" class="report-container" style="display: none;"></div>
 
                 <div class="info-box">
-                    <h3>Recommended Specifications:</h3>
+                    <h3><i class="bi bi-check2-circle"></i> Recommended Specifications:</h3>
                     <ul>
-                        <li><strong>GPU:</strong> NVIDIA with at least 8GB VRAM (minimum 4GB)</li>
+                        <li><strong>GPU:</strong> NVIDIA with at least 8GB VRAM (minimum 4GB) or Apple Silicon (MPS)</li>
                         <li><strong>CPU:</strong> 4+ modern cores (Intel i5/AMD Ryzen 5 or better)</li>
                         <li><strong>RAM:</strong> 16GB (minimum 8GB)</li>
                         <li><strong>Storage:</strong> Fast SSD (NVMe recommended)</li>
@@ -202,7 +207,7 @@
         <!-- Tab 2: Preprocessing -->
         <div class="tab-content" id="preprocessing-tab">
             <div class="panel">
-                <h2>📊 Image Preprocessing</h2>
+                <h2><i class="bi bi-sliders"></i> Image Preprocessing</h2>
                 <p class="info-text">Apply preprocessing to optimize images for AI processing. Upload your images and a
                     statistics file to adjust brightness and contrast.</p>
 
@@ -211,14 +216,14 @@
                     <label>
                         Upload Images to Preprocess:
                         <span class="info-tooltip"
-                            data-tooltip="Upload the images you want to preprocess. The system will analyze each image and apply adjustments based on the statistics to optimize them for AI processing."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+                            data-tooltip="Upload the images you want to preprocess. The system will analyze each image and apply adjustments based on the statistics to optimize them for AI processing."><i class="bi bi-info-circle"></i></span>
                     </label>
                     <div class="image-upload-area" id="preprocess-upload-area">
                         <input type="file" id="preprocess-image-upload" multiple accept="image/*"
                             class="file-input-hidden">
                         <div class="upload-placeholder">
-                            <div class="upload-icon">📁</div>
-                            <p>Click to select images or drag & drop here</p>
+                            <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+                            <p>Click to select images or drag &amp; drop here</p>
                             <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
                         </div>
                         <div class="upload-preview" id="preprocess-preview" style="display: none;"></div>
@@ -229,7 +234,7 @@
                     <label for="stats-file-upload">
                         Upload Statistics File (.npy):
                         <span class="info-tooltip"
-                            data-tooltip="Upload a .npy statistics file. You can use one of the provided statistics files (Montale, Cimino) or create your own in the Advanced section."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+                            data-tooltip="Upload a .npy statistics file. You can use one of the provided statistics files (Montale, Cimino) or create your own in the Advanced section."><i class="bi bi-info-circle"></i></span>
                     </label>
                     <input type="file" id="stats-file-upload" accept=".npy" class="file-input">
                 </div>
@@ -238,18 +243,19 @@
                     <label for="preprocess-output-dir">
                         Output Directory:
                         <span class="info-tooltip"
-                            data-tooltip="Folder where the preprocessed images will be saved. Will be created if it doesn't exist."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+                            data-tooltip="Folder where the preprocessed images will be saved. Will be created if it doesn't exist."><i class="bi bi-info-circle"></i></span>
                     </label>
                     <div class="input-with-button">
                         <input type="text" id="preprocess-output-dir" value="./preprocessed_images"
                             class="form-control">
-                        <button type="button" id="browse-preprocess-dir" class="btn btn-secondary btn-small">📁
-                            Browse...</button>
+                        <button type="button" id="browse-preprocess-dir" class="btn btn-secondary btn-small">
+                            <i class="bi bi-folder2-open"></i> Browse...
+                        </button>
                     </div>
                 </div>
 
                 <button id="preprocess-btn" class="btn btn-primary" disabled>
-                    <span>✨</span> Apply Preprocessing
+                    <i class="bi bi-stars"></i> Apply Preprocessing
                 </button>
 
                 <div id="preprocess-progress" class="progress-container" style="display: none; margin-top: 16px;">
@@ -265,7 +271,8 @@
                 <!-- Advanced Section - Collapsible -->
                 <details class="advanced-section">
                     <summary class="advanced-toggle">
-                        <span>⚙️ Advanced: Calculate Custom Statistics</span>
+                        <span><i class="bi bi-gear-fill"></i> Advanced: Calculate Custom Statistics</span>
+                        <i class="bi bi-chevron-right toggle-icon"></i>
                     </summary>
                     <div class="advanced-content">
                         <p class="info-text">Create your own statistics file from a set of representative images. This
@@ -275,14 +282,14 @@
                             <label>
                                 Upload Images for Statistics:
                                 <span class="info-tooltip"
-                                    data-tooltip="Upload a representative sample of your training images. The system will analyze their properties (brightness, contrast, etc.) to create optimal preprocessing parameters."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+                                    data-tooltip="Upload a representative sample of your training images. The system will analyze their properties (brightness, contrast, etc.) to create optimal preprocessing parameters."><i class="bi bi-info-circle"></i></span>
                             </label>
                             <div class="image-upload-area" id="stats-upload-area">
                                 <input type="file" id="stats-image-upload" multiple accept="image/*"
                                     class="file-input-hidden">
                                 <div class="upload-placeholder">
-                                    <div class="upload-icon">📁</div>
-                                    <p>Click to select images or drag & drop here</p>
+                                    <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+                                    <p>Click to select images or drag &amp; drop here</p>
                                     <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
                                 </div>
                                 <div class="upload-preview" id="stats-preview" style="display: none;"></div>
@@ -293,17 +300,18 @@
                             <label for="stats-save-path">
                                 Save Statistics As:
                                 <span class="info-tooltip"
-                                    data-tooltip="Path where the calculated statistics will be saved as a .npy file. You can reuse this file later for preprocessing other images."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+                                    data-tooltip="Path where the calculated statistics will be saved as a .npy file. You can reuse this file later for preprocessing other images."><i class="bi bi-info-circle"></i></span>
                             </label>
                             <div class="input-with-button">
                                 <input type="text" id="stats-save-path" value="./custom_stats.npy" class="form-control">
-                                <button type="button" id="browse-stats-path" class="btn btn-secondary btn-small">📁
-                                    Browse...</button>
+                                <button type="button" id="browse-stats-path" class="btn btn-secondary btn-small">
+                                    <i class="bi bi-folder2-open"></i> Browse...
+                                </button>
                             </div>
                         </div>
 
                         <button id="calculate-stats-btn" class="btn btn-secondary" disabled>
-                            <span>📊</span> Calculate Statistics
+                            <i class="bi bi-bar-chart-line"></i> Calculate Statistics
                         </button>
 
                         <div id="stats-output" class="output-container" style="display: none;"></div>
@@ -315,259 +323,296 @@
         <!-- Tab 3: Model Diagnostics -->
         <div class="tab-content" id="diagnostics-tab">
             <div class="panel">
-                <h2>🔍 Pre-Processing Analysis</h2>
-                <p class="info-text">Run preliminary tests to visualize patch processing and contrast comparisons before
-                    full processing.</p>
+                <h2><i class="bi bi-search"></i> Pre-Processing Analysis</h2>
+                <p class="info-text">Run preliminary tests to visualize patch processing and contrast comparisons before full processing.</p>
 
-                <div class="form-group">
-                    <label for="diag-model-select">
-                        Select Model:
-                        <span class="info-tooltip"
-                            data-tooltip="Choose the AI model optimized for your pottery type. Each model is trained on different archaeological periods and styles."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                    </label>
-                    <select id="diag-model-select" class="form-control">
-                        {% for name, info in models.items() %}
-                        <option value="{{ name }}">{{ name }} ({{ info.size }}) - {{ info.description }}</option>
-                        {% endfor %}
-                        <option value="custom">📁 Custom Model (Local File)...</option>
-                    </select>
-                </div>
+                <!-- Section 1: Model & Test Images -->
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <h3 class="form-section-title"><i class="bi bi-cpu"></i> 1. Model &amp; Sample Drawings</h3>
+                    </div>
 
-                <div class="form-group" id="diag-custom-model-upload" style="display: none;">
-                    <label for="diag-custom-model-file">
-                        Upload Custom Model (.pkl):
-                        <span class="info-tooltip"
-                            data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                    </label>
-                    <input type="file" id="diag-custom-model-file" accept=".pkl" class="file-input">
-                    <small style="display: block; margin-top: 5px; color: #666;">
-                        Select a local .pkl model file
-                    </small>
-                </div>
+                    <div class="form-group">
+                        <label for="diag-model-select">
+                            Select Model:
+                            <span class="info-tooltip"
+                                data-tooltip="Choose the AI model optimized for your pottery type. Each model is trained on different archaeological periods and styles."><i class="bi bi-info-circle"></i></span>
+                        </label>
+                        <select id="diag-model-select" class="form-control">
+                            {% for name, info in models.items() %}
+                            <option value="{{ name }}">{{ name }} ({{ info.size }}) - {{ info.description }}</option>
+                            {% endfor %}
+                            <option value="custom">Custom Model (Local File)...</option>
+                        </select>
+                    </div>
 
-                <div class="form-group">
-                    <label>
-                        Upload Images:
-                        <span class="info-tooltip"
-                            data-tooltip="Upload pottery drawings to run diagnostic tests. The system will show you how different parameters affect the output."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                    </label>
-                    <div class="image-upload-area" id="diag-upload-area">
-                        <input type="file" id="diag-image-upload" multiple accept="image/*" class="file-input-hidden">
-                        <div class="upload-placeholder">
-                            <div class="upload-icon">📁</div>
-                            <p>Click to select images or drag & drop here</p>
-                            <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                    <div class="form-group" id="diag-custom-model-upload" style="display: none;">
+                        <label for="diag-custom-model-file">
+                            Upload Custom Model (.pkl):
+                            <span class="info-tooltip"
+                                data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture."><i class="bi bi-info-circle"></i></span>
+                        </label>
+                        <input type="file" id="diag-custom-model-file" accept=".pkl" class="file-input">
+                        <small style="display: block; margin-top: 5px; color: var(--text-muted);">
+                            Select a local .pkl model file
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            Upload Sample Images (Max 5):
+                            <span class="info-tooltip"
+                                data-tooltip="Upload pottery drawings to run diagnostic tests. The system will show you how different parameters affect the output."><i class="bi bi-info-circle"></i></span>
+                        </label>
+                        <div class="image-upload-area" id="diag-upload-area">
+                            <input type="file" id="diag-image-upload" multiple accept="image/*" class="file-input-hidden">
+                            <div class="upload-placeholder">
+                                <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+                                <p>Click to select images or drag &amp; drop here</p>
+                                <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                            </div>
+                            <div class="upload-preview" id="diag-preview" style="display: none;"></div>
                         </div>
-                        <div class="upload-preview" id="diag-preview" style="display: none;"></div>
                     </div>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="diag-patch-size">
-                            Patch Size:
+                <!-- Section 2: Parameters -->
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <h3 class="form-section-title"><i class="bi bi-sliders"></i> 2. Diagnostic Parameters</h3>
+                    </div>
+
+                    <div class="form-grid-params">
+                        <div class="form-group">
+                            <label for="diag-patch-size">
+                                Patch Size:
+                                <span class="info-tooltip"
+                                    data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512"><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <input type="number" id="diag-patch-size" value="512" min="256" max="1024" step="64"
+                                class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="diag-overlap">
+                                Overlap:
+                                <span class="info-tooltip"
+                                    data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64"><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <input type="number" id="diag-overlap" value="64" min="0" max="256" step="16"
+                                class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 14px;">
+                        <label for="diag-contrast">
+                            Contrast Test Values:
                             <span class="info-tooltip"
-                                data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+                                data-tooltip="Comma-separated contrast values to test. The model will generate outputs for each value so you can compare results. Example: 0.75, 1.0, 1.5, 2.0"><i class="bi bi-info-circle"></i></span>
                         </label>
-                        <input type="number" id="diag-patch-size" value="512" min="256" max="1024" step="64"
-                            class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="diag-overlap">
-                            Overlap:
-                            <span class="info-tooltip"
-                                data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                        </label>
-                        <input type="number" id="diag-overlap" value="64" min="0" max="256" step="16"
-                            class="form-control">
+                        <input type="text" id="diag-contrast" value="0.75, 1.0, 1.5, 2.0" class="form-control">
+                        <small>Comma-separated values for contrast comparison</small>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="diag-contrast">
-                        Contrast Test Values:
-                        <span class="info-tooltip"
-                            data-tooltip="Comma-separated contrast values to test. The model will generate outputs for each value so you can compare results. Example: 0.75, 1.0, 1.5, 2.0"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                    </label>
-                    <input type="text" id="diag-contrast" value="0.75, 1.0, 1.5, 2.0" class="form-control">
-                    <small>Comma-separated values for contrast comparison</small>
-                </div>
-
-                <button id="run-diagnostics-btn" class="btn btn-primary" disabled>
-                    <span>🚀</span> Run Diagnostics
-                </button>
-
-                <div id="diag-progress" class="progress-container" style="display: none; margin-top: 16px;">
-                    <h4>Overall Progress:</h4>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="diag-progress-fill"></div>
+                <!-- Section 3: Execution & Visual Analysis -->
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <h3 class="form-section-title"><i class="bi bi-play-circle"></i> 3. Test Execution &amp; Results</h3>
                     </div>
-                    <p id="diag-status">Processing...</p>
-                </div>
 
-                <div id="diagnostics-output" class="output-container" style="display: none;"></div>
-                <div id="diagnostics-gallery" class="gallery" style="display: none;"></div>
+                    <button id="run-diagnostics-btn" class="btn btn-primary" disabled>
+                        <i class="bi bi-play-circle-fill"></i> Run Diagnostics
+                    </button>
+
+                    <div id="diag-progress" class="progress-container" style="display: none; margin-top: 16px;">
+                        <h4>Overall Progress:</h4>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="diag-progress-fill"></div>
+                        </div>
+                        <p id="diag-status">Processing...</p>
+                    </div>
+
+                    <div id="diagnostics-output" class="output-container" style="display: none;"></div>
+                    <div id="diagnostics-gallery" class="gallery" style="display: none;"></div>
+                </div>
             </div>
         </div>
 
         <!-- Tab 4: Batch Processing -->
         <div class="tab-content" id="processing-tab">
             <div class="panel">
-                <h2>🎨 Batch Image Processing</h2>
-                <p class="info-text">Process multiple pottery drawings with AI enhancement.</p>
+                <h2><i class="bi bi-palette"></i> Batch Image Processing</h2>
+                <p class="info-text">Process multiple pottery drawings with AI enhancement to produce publication-ready line art.</p>
 
-                <div class="form-group">
-                    <label for="process-model-select">
-                        Select Model:
-                        <span class="info-tooltip"
-                            data-tooltip="Choose the AI model best suited for your pottery type. Models are specialized for different archaeological periods: Bronze Age, Protohistoric, Historic, or general-purpose."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                    </label>
-                    <select id="process-model-select" class="form-control">
-                        {% for name, info in models.items() %}
-                        <option value="{{ name }}">{{ name }} ({{ info.size }}) - {{ info.description }}</option>
-                        {% endfor %}
-                        <option value="custom">📁 Custom Model (Local File)...</option>
-                    </select>
-                    <small class="model-status-text" id="model-status-text"
-                        style="display: block; margin-top: 5px; color: #666;">
-                        Model will be automatically downloaded if not present
-                    </small>
-                </div>
+                <!-- Section 1: AI Model & Source Drawings -->
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <h3 class="form-section-title"><i class="bi bi-cpu"></i> 1. AI Model &amp; Source Drawings</h3>
+                    </div>
 
-                <div class="form-group" id="custom-model-upload" style="display: none;">
-                    <label for="custom-model-file">
-                        Upload Custom Model (.pkl):
-                        <span class="info-tooltip"
-                            data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                    </label>
-                    <input type="file" id="custom-model-file" accept=".pkl" class="file-input">
-                    <small style="display: block; margin-top: 5px; color: #666;">
-                        Select a local .pkl model file
-                    </small>
-                </div>
+                    <div class="form-group">
+                        <label for="process-model-select">
+                            Select Model:
+                            <span class="info-tooltip"
+                                data-tooltip="Choose the AI model best suited for your pottery type. Models are specialized for different archaeological periods: Bronze Age, Protohistoric, Historic, or general-purpose."><i class="bi bi-info-circle"></i></span>
+                        </label>
+                        <select id="process-model-select" class="form-control">
+                            {% for name, info in models.items() %}
+                            <option value="{{ name }}">{{ name }} ({{ info.size }}) - {{ info.description }}</option>
+                            {% endfor %}
+                            <option value="custom">Custom Model (Local File)...</option>
+                        </select>
+                        <small class="model-status-text" id="model-status-text"
+                            style="display: block; margin-top: 5px; color: var(--text-muted);">
+                            Model will be automatically downloaded if not present
+                        </small>
+                    </div>
 
-                <div class="form-group">
-                    <label>
-                        Upload Images:
-                        <span class="info-tooltip"
-                            data-tooltip="Upload pottery drawings to enhance with AI. All images will be processed in batch. Supports PNG, JPG, and JPEG formats."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                    </label>
-                    <div class="image-upload-area" id="process-upload-area">
-                        <input type="file" id="process-image-upload" multiple accept="image/*"
-                            class="file-input-hidden">
-                        <div class="upload-placeholder">
-                            <div class="upload-icon">📁</div>
-                            <p>Click to select images or drag & drop here</p>
-                            <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                    <div class="form-group" id="custom-model-upload" style="display: none;">
+                        <label for="custom-model-file">
+                            Upload Custom Model (.pkl):
+                            <span class="info-tooltip"
+                                data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture."><i class="bi bi-info-circle"></i></span>
+                        </label>
+                        <input type="file" id="custom-model-file" accept=".pkl" class="file-input">
+                        <small style="display: block; margin-top: 5px; color: var(--text-muted);">
+                            Select a local .pkl model file
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            Upload Pottery Drawings:
+                            <span class="info-tooltip"
+                                data-tooltip="Upload pottery drawings to enhance with AI. All images will be processed in batch. Supports PNG, JPG, and JPEG formats."><i class="bi bi-info-circle"></i></span>
+                        </label>
+                        <div class="image-upload-area" id="process-upload-area">
+                            <input type="file" id="process-image-upload" multiple accept="image/*"
+                                class="file-input-hidden">
+                            <div class="upload-placeholder">
+                                <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+                                <p>Click to select images or drag &amp; drop here</p>
+                                <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                            </div>
+                            <div class="upload-preview" id="process-preview" style="display: none;"></div>
                         </div>
-                        <div class="upload-preview" id="process-preview" style="display: none;"></div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="process-output-dir">
-                        Output Directory:
-                        <span class="info-tooltip"
-                            data-tooltip="Specify the folder where processed images will be saved. Can be an absolute path or relative to the application folder."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                    </label>
-                    <div class="input-with-button">
-                        <input type="text" id="process-output-dir" value="./enhanced_pottery" class="form-control"
-                            placeholder="Enter output folder path">
-                        <button type="button" id="browse-output-dir" class="btn btn-secondary btn-small">📁
-                            Browse...</button>
+                <!-- Section 2: Reconstruction Parameters -->
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <h3 class="form-section-title"><i class="bi bi-sliders"></i> 2. Reconstruction Parameters</h3>
                     </div>
-                    <small style="display: block; margin-top: 5px; color: #666;">
-                        Specify where to save the processed images or click Browse to select a folder
-                    </small>
-                </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="process-patch-size">
-                            Patch Size:
+                    <div class="form-grid-params">
+                        <div class="form-group">
+                            <label for="process-patch-size">
+                                Patch Size:
+                                <span class="info-tooltip"
+                                    data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512"><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <input type="number" id="process-patch-size" value="512" min="256" max="1024" step="64"
+                                class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="process-overlap">
+                                Overlap:
+                                <span class="info-tooltip"
+                                    data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64"><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <input type="number" id="process-overlap" value="64" min="0" max="256" step="16"
+                                class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="process-contrast">
+                                Contrast Scale:
+                                <span class="info-tooltip"
+                                    data-tooltip="Adjusts input image contrast before AI processing. >1 increases contrast, <1 decreases. Recommended: 1.0"><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <input type="number" id="process-contrast" value="1.0" min="0.5" max="3.0" step="0.1"
+                                class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="process-upscale">
+                                Scale Factor:
+                                <span class="info-tooltip"
+                                    data-tooltip="Scales images before processing. Values > 1 upscale (better quality but slower), values < 1 downscale (faster). Use 1 for original size. Range: 0.25-4"><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <input type="number" id="process-upscale" value="1" min="0.25" max="4" step="0.25"
+                                class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-checkbox-card">
+                        <label>
+                            <input type="checkbox" id="use-fp16">
+                            <span>Use FP16 (Half Precision &mdash; Recommended for NVIDIA CUDA GPUs)</span>
                             <span class="info-tooltip"
-                                data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+                                data-tooltip="Uses 16-bit precision for faster processing on CUDA GPUs. Reduces VRAM usage but may affect quality slightly. Only works on NVIDIA GPUs."><i class="bi bi-info-circle"></i></span>
                         </label>
-                        <input type="number" id="process-patch-size" value="512" min="256" max="1024" step="64"
-                            class="form-control">
                     </div>
+                </div>
+
+                <!-- Section 3: Output & Processing -->
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <h3 class="form-section-title"><i class="bi bi-folder-check"></i> 3. Output Destination &amp; Execution</h3>
+                    </div>
+
                     <div class="form-group">
-                        <label for="process-overlap">
-                            Overlap:
+                        <label for="process-output-dir">
+                            Output Directory:
                             <span class="info-tooltip"
-                                data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
+                                data-tooltip="Specify the folder where processed images will be saved. Can be an absolute path or relative to the application folder."><i class="bi bi-info-circle"></i></span>
                         </label>
-                        <input type="number" id="process-overlap" value="64" min="0" max="256" step="16"
-                            class="form-control">
+                        <div class="input-with-button">
+                            <input type="text" id="process-output-dir" value="./enhanced_pottery" class="form-control"
+                                placeholder="Enter output folder path">
+                            <button type="button" id="browse-output-dir" class="btn btn-secondary btn-small">
+                                <i class="bi bi-folder2-open"></i> Browse...
+                            </button>
+                        </div>
+                        <small style="display: block; margin-top: 5px; color: var(--text-muted);">
+                            Specify where to save the processed images or click Browse to select a folder
+                        </small>
                     </div>
+
+                    <button id="process-images-btn" class="btn btn-success btn-large" disabled style="width: 100%; margin-top: 8px;">
+                        <i class="bi bi-play-circle-fill"></i> Start Processing
+                    </button>
+
+                    <div id="process-progress" class="progress-container" style="display: none;">
+                        <h4>Overall Progress:</h4>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="process-progress-fill"></div>
+                        </div>
+                        <p id="process-status">Processing...</p>
+
+                        <h4 style="margin-top: 20px;">Current Image Patches:</h4>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="patch-progress-fill"></div>
+                        </div>
+                        <p id="patch-status">Waiting...</p>
+                    </div>
+
+                    <div id="process-output" class="output-container" style="display: none;"></div>
+                    <div id="process-gallery" class="gallery" style="display: none;"></div>
                 </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="process-contrast">
-                            Contrast Scale:
-                            <span class="info-tooltip"
-                                data-tooltip="Adjusts input image contrast before AI processing. >1 increases contrast, <1 decreases. Recommended: 1.0"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                        </label>
-                        <input type="number" id="process-contrast" value="1.0" min="0.5" max="3.0" step="0.1"
-                            class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="process-upscale">
-                            Scale Factor:
-                            <span class="info-tooltip"
-                                data-tooltip="Scales images before processing. Values > 1 upscale (better quality but slower), values < 1 downscale (faster). Use 1 for original size. Supports decimals (e.g., 0.5, 1.25, 1.75). Range: 0.25-4"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                        </label>
-                        <input type="number" id="process-upscale" value="1" min="0.25" max="4" step="0.25"
-                            class="form-control">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="use-fp16">
-                        Use FP16 (half precision - CUDA only)
-                        <span class="info-tooltip"
-                            data-tooltip="Uses 16-bit precision for faster processing on CUDA GPUs. Reduces VRAM usage but may affect quality slightly. Only works on NVIDIA GPUs."><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span>
-                    </label>
-                </div>
-
-                <button id="process-images-btn" class="btn btn-success btn-large" disabled>
-                    <span>🚀</span> Start Processing
-                </button>
-
-                <div id="process-progress" class="progress-container" style="display: none;">
-                    <h4>Overall Progress:</h4>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="process-progress-fill"></div>
-                    </div>
-                    <p id="process-status">Processing...</p>
-
-                    <h4 style="margin-top: 20px;">Current Image Patches:</h4>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="patch-progress-fill"></div>
-                    </div>
-                    <p id="patch-status">Waiting...</p>
-                </div>
-
-                <div id="process-output" class="output-container" style="display: none;"></div>
-                <div id="process-gallery" class="gallery" style="display: none;"></div>
             </div>
         </div>
-
-
 
     </div>
 
     <!-- Lightbox Modal for fullscreen images -->
-    <div id="lightbox-overlay" class="lightbox-overlay">
+    <div id="lightbox-overlay" class="lightbox-overlay" role="dialog" aria-modal="true" aria-label="Fullscreen image preview">
         <div class="lightbox-content">
-            <button class="lightbox-close" id="lightbox-close">&times;</button>
-            <img src="" alt="Fullscreen preview" class="lightbox-image" id="lightbox-image">
+            <button class="lightbox-close" id="lightbox-close" aria-label="Close fullscreen preview"><i class="bi bi-x-lg"></i></button>
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" alt="Fullscreen preview" class="lightbox-image" id="lightbox-image">
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}"></script>
 </body>
 
 </html>
