@@ -4,154 +4,118 @@
 
 <img src="imgs/LogoInk.png" width="250"/>
 
-[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://lrncrd.github.io/PyPotteryInk/)
-[![Documentation](https://img.shields.io/badge/docs-online-brightgreen.svg)](https://lrncrd.github.io/PyPotteryInk/)
-[![HuggingFace](https://img.shields.io/badge/🤗%20Models-PyPotteryInk-yellow.svg)](https://huggingface.co/lrncrd/PyPotteryInk)
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.culher.2025.06.016-blue.svg)](https://doi.org/10.1016/j.culher.2025.06.016)
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/lrncrd/PyPotteryInk)
 [![GPU Support](https://img.shields.io/badge/GPU-CUDA%20%7C%20MPS-green.svg)](https://github.com/lrncrd/PyPotteryInk)
-
-
+[![HuggingFace](https://img.shields.io/badge/🤗%20Models-PyPotteryInk-yellow.svg)](https://huggingface.co/lrncrd/PyPotteryInk)
+[![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.culher.2025.06.016-blue.svg)](https://doi.org/10.1016/j.culher.2025.06.016)
 
 *Transform archaeological pottery drawings into publication-ready illustrations with AI*
 
 🚀 Try the [demo](https://githubtocolab.com/lrncrd/PyPotteryInk/blob/main/PyPotteryInk_example.ipynb) on Google Colab 🚀
 
----
-
-### ☕ Support This Project
-
-If you find PyPotteryInk useful for your research, consider supporting its development:
-
-[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/lrncrd)
-
-Your support helps maintain and improve this open-source tool for the archaeological community!
-
-
 </div>
 
+---
 
-## 🎯 Overview
+## Introduction
 
-As part of the **PyPottery** toolkit, `PyPotteryInk` is a deep learning application for automating the digital inking process of archaeological pottery drawings. It transforms pencil drawings into publication-ready illustrations while preserving the original characteristics and enhancing their analytical power.
+As part of the **PyPottery** toolkit, **PyPotteryInk** is a deep learning application for automating the digital inking process of archaeological pottery drawings. It transforms pencil drawings into publication-ready illustrations while preserving the original characteristics and enhancing their analytical power.
 
 <div align="center">
 <img src="imgs/comparison.jpg" width="800"/>
-<p><em>Example of PyPotteryInk transformation: from pencil sketch to publication-ready illustration</em></p>
+<p><em>From pencil sketch to publication-ready illustration</em></p>
 </div>
 
 ## ✨ Features
 
-- 🚀 **Single-Step Translation**: Convert pencil drawings to inked versions using state-of-the-art diffusion models
-- 🖼️ **High-Resolution Processing**: Advanced patch-based system for handling large drawings
-- 🎨 **Stippling Control**: Fine-grained control over dot patterns and shading
-- 📂 **Batch Processing**: Efficient handling of multiple drawings
-- 🖥️ **Multi-GPU Support**: Now supports CUDA (NVIDIA), MPS (Apple Silicon M1/M2/M3), and CPU fallback
-- 🌐 **Web Interface**: User-friendly Flask-based web interface for easy access
-- 📊 **Preprocessing Tools**: Built-in image analysis and optimization with detailed statistics visualization
-- 🔧 **Easy Installation**: One-click installation scripts for all major operating systems
-- 🎯 **Custom Models**: Support for uploading and using custom-trained models
-
-## 🚀 Quick Start
-
-### Installation
-
-PyPotteryInk includes a unified installation script that works on all platforms:
-
-```bash
-git clone https://github.com/lrncrd/PyPotteryInk.git
-cd PyPotteryInk
-python install.py
-```
-
-The installation script will:
-- Create a virtual environment
-- Install all dependencies
-- Download required models
-- Set up the application
-
-### Running the Application
-
-After installation:
-- **Windows**: Double-click `PyPotteryInk_WIN.bat` or run `python app.py` from terminal
-- **macOS/Linux**: Run `./PyPotteryInk_UNIX.sh` or `python app.py`
-
-The web interface will open automatically in your browser at `http://127.0.0.1:5003`.
-
-### Web Interface
-
-Version 2.0.0 introduces a modern Flask-based web interface with real-time processing updates.
+- **Single-Step Translation**: Convert pencil drawings to inked versions using state-of-the-art diffusion models
+- **High-Resolution Processing**: Patch-based system for handling large drawings
+- **Stippling Control**: Fine-grained control over dot patterns and shading
+- **Batch Processing**: Efficient handling of multiple drawings with real-time progress
+- **Multi-GPU Support**: CUDA (NVIDIA), MPS (Apple Silicon) and CPU fallback
+- **Web Interface**: Local Flask interface with hardware check, model management, diagnostics and preprocessing statistics
+- **Custom Models**: Upload and use your own fine-tuned models
 
 <div align="center">
 <img src="imgs/gui_example.png" width="800"/>
 </div>
 
-1. **Hardware Check Tab**: Verify your system meets requirements
-2. **Model Management**: Download and manage AI models
-3. **Model Diagnostics Tab**: Test different settings before processing
-4. **Preprocessing Tab**: 
-   - Calculate detailed statistics from your dataset
-   - View distribution plots and summary tables
-   - Apply optimizations based on statistical analysis
-5. **Batch Processing Tab**: Process multiple images with real-time progress tracking
-6. **Custom Model Upload**: Upload and use your own fine-tuned models
+## 🚀 Quick Start
 
-## 📚 Documentation
+### Option 1 — PyPottery Suite Launcher (recommended)
 
-<div align="center">
-  <a href="https://lrncrd.github.io/PyPotteryInk/">
-    <img src="https://img.shields.io/badge/📖%20Read%20the%20Docs-PyPotteryInk-4A5568?style=for-the-badge&logo=read-the-docs&logoColor=white" alt="Documentation"/>
+The easiest way to get started, no Python installation required.
+
+<p align="center">
+  <a href="https://github.com/lrncrd/PyPottery/releases/latest">
+    <img src="https://img.shields.io/badge/Download-PyPottery%20Launcher-667eea?style=for-the-badge&logoColor=white" alt="Download Launcher">
   </a>
-</div>
+</p>
+
+1. Grab the installer for your OS from [Releases](https://github.com/lrncrd/PyPottery/releases/latest)
+2. Run it (Windows) or drag-to-Applications (macOS) — no Python install required
+3. Launch PyPotteryInk from the suite launcher; updates are handled automatically
+
+### Option 2 — Manual installation (from source)
+
+For developers, or anyone who wants to run the app on its own:
+
+```bash
+# Clone repository
+git clone https://github.com/lrncrd/PyPotteryInk.git
+cd PyPotteryInk
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the app
+python app.py
+# Then open http://127.0.0.1:5003 in your browser
+```
+
+Models are downloaded from the **Model Management** tab of the interface. A one-step installer that also creates a virtual environment is available too: `python install.py`.
+
+## 📋 System Requirements
+
+- **Python**: 3.11+
+- **Operating System**: Windows 10/11, macOS 11+, Linux (Ubuntu 20.04+)
+- **CPU / RAM**: 4+ cores, 8GB RAM (16GB recommended)
+- **GPU** (optional but strongly recommended): NVIDIA GTX 1060 6GB or better (CUDA, FP16), or Apple Silicon M1/M2/M3 with 8GB+ unified memory (MPS, FP32). CPU-only works but is significantly slower
+- **Storage**: 5GB free for models and processing
+
+Benchmarks per GPU are in the [Model Zoo](https://lrncrd.github.io/PyPottery/pypotteryink/model_zoo.html) page.
+
+## 🎯 Usage
+
+1. **Check your hardware** in the *Hardware Check* tab
+2. **Download a model** from *Model Management* (or upload your own)
+3. **Test settings** on a single drawing in *Model Diagnostics*
+4. *(Optional)* **Preprocess**: compute dataset statistics and apply suggested optimizations
+5. **Batch process** a folder of drawings and follow the real-time progress
+
+For the full walkthrough, see the **[Usage Guide](https://lrncrd.github.io/PyPottery/pypotteryink/usage.html)**. Something not working? See [Installation](https://lrncrd.github.io/PyPottery/pypotteryink/installation.html) and the troubleshooting notes in [Advanced](https://lrncrd.github.io/PyPottery/pypotteryink/advanced.html).
 
 ## 🤖 Available Models
 
-| Model | Description | Checkpoint Size | Link |
-|-------|-------------|------|------|
-| **10k Model** | General-purpose model for pottery drawings | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/model_10k.pkl?download=true) |
-| **6h-MCG Model** | High-quality model for Bronze Age drawings | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MCG.pkl?download=true) |
-| **6h-MC Model** | High-quality model for Protohistoric and Historic drawings | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MC.pkl?download=true) |
-| **4h-PAINT Model** | Tailored model for Historic and painted pottery | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/4h-PAINT.pkl?download=true) |
-| **5h-PAPERGRID Model** | Tailored model for handling paper grid tables (does not support shadows) | 38.3MB | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/5h_PAPERGRID.pkl?download=true) |
+| Model | Description | Download |
+|-------|-------------|------|
+| **10k Model** | General-purpose model for pottery drawings | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/model_10k.pkl?download=true) |
+| **6h-MCG Model** | High-quality model for Bronze Age drawings | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MCG.pkl?download=true) |
+| **6h-MC Model** | High-quality model for Protohistoric and Historic drawings | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/6h-MC.pkl?download=true) |
+| **4h-PAINT Model** | Tailored model for Historic and painted pottery | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/4h-PAINT.pkl?download=true) |
+| **5h-PAPERGRID Model** | Tailored model for paper grid tables (does not support shadows) | [Download](https://huggingface.co/lrncrd/PyPotteryInk/resolve/main/5h_PAPERGRID.pkl?download=true) |
 
+All models are ~38MB and support custom fine-tuning for specific archaeological contexts or styles. Details: [Model Zoo](https://lrncrd.github.io/PyPottery/pypotteryink/model_zoo.html).
 
+## 📊 What's New
 
-All models support custom fine-tuning for specific archaeological contexts or styles.
-
-## ⚡ Benchmarks
-
-| GPU                 | Processing time for `test_image.jpg` (s) | FP16 Support |
-| ------------------- | -------------------------------- | ------------ |
-| 3070Ti (Windows 11) | ~50-55                     | ✅ Yes        |
-| T4 (Google Colab)   | ~55-60                           | ✅ Yes        |
-| M2 Pro (macOS)      | ~65-75                          | ❌ No (FP32)  |
-| M1 (macOS)          | ~80-90                          | ❌ No (FP32)  |
-| CPU (i7-9700K)     | ~300-400                        | ❌ No (FP32)  |
-
-**Note**: FP16 (half precision) is only supported on CUDA GPUs. Apple Silicon (MPS) and CPU use FP32 for stability. 
-
-
-## 🖥️ System Requirements
-
-### Minimum Requirements
-- **CPU**: 4+ cores (Intel i5/AMD Ryzen 5 or better)
-- **RAM**: 8GB (16GB recommended)
-- **GPU**: 
-  - NVIDIA: GTX 1060 6GB or better (RTX series recommended)
-  - Apple: M1/M2/M3 with 8GB+ unified memory
-- **Storage**: 5GB free space for models and processing
-- **OS**: Windows 10/11, macOS 11+, Linux (Ubuntu 20.04+)
-
-### GPU Support
-- **CUDA (NVIDIA)**: Full support with FP16 optimization
-- **MPS (Apple Silicon)**: Full support with FP32 (automatic)
-- **CPU**: Fallback mode (significantly slower)
-
-
+See the **[Version History](https://lrncrd.github.io/PyPottery/pypotteryink/version_history.html)** for the full changelog.
 
 ## 📢 AI Disclosure and Citation
 
-PyPotteryInk uses Generative AI to translate archaeological pottery drawings into publication-ready illustrations. To promote transparency about the use of Generative AI and proper attribution in scientific research, is required all users to include the following disclosure statement in any publication, presentation, or report that utilizes PyPotteryInk:
+PyPotteryInk uses Generative AI to translate archaeological pottery drawings into publication-ready illustrations. To promote transparency about the use of Generative AI and proper attribution in scientific research, all users are required to include the following disclosure statement in any publication, presentation, or report that utilizes PyPotteryInk:
 
 ```
 This research utilized PyPotteryInk (version 2.0) for the AI-assisted translation of [number] pottery drawings. PyPotteryInk is a generative AI tool developed by Lorenzo Cardarelli (https://github.com/lrncrd/PyPotteryInk).
@@ -181,7 +145,7 @@ If you use PyPotteryInk in your research, please cite:
 }
 ```
 
-or 
+or
 
 ```bibtex
 @article{cardarelli_pypotteryink_2025,
@@ -199,70 +163,20 @@ or
 }
 ```
 
-
 ## 👥 Contributors
 
 <a href="https://github.com/lrncrd/PyPotteryInk/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=lrncrd/PyPotteryInk" />
 </a>
 
+## ☕ Support This Project
 
+If you find PyPotteryInk useful for your research, consider supporting its development:
 
-Developed with ❤️ by [Lorenzo Cardarelli](https://github.com/lrncrd)
+[![Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/lrncrd)
 
-Based on img2img-turbo by [GaParmar](https://github.com/GaParmar/img2img-turbo)
-
-The original code was released under the MIT Licence. The changes made in this fork are released under the Apache License 2.0.
-
-
-
-
-## 🆕 What's New in Version 2.1.0
-
-- Modified System Requirements Check
-- Added Pixel
-- Minor UI Improvements
-
-## 🛠️ Development Setup
-
-For developers who want to contribute:
-
-```bash
-git clone https://github.com/lrncrd/PyPotteryInk.git
-cd PyPotteryInk
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-
-1. **Out of memory errors**
-   - Reduce patch size in settings (try 384 or 256)
-   - Close other applications
-   - Use CPU mode as fallback (slower but more stable)
-
-2. **Models not downloading**
-   - Check your internet connection
-   - Models are downloaded from Hugging Face (may be blocked in some regions)
-   - Manual download links are available in the table above
-
-3. **Flask server not starting**
-   - Check if port 5003 is already in use
-   - Try closing other applications that might use this port
-   - Alternatively, modify the port in `app.py` (last line)
-
-4. **Statistics visualization not showing**
-   - Ensure scipy is installed: `pip install scipy`
-   - Check that you have at least 2 images for meaningful statistics
-   - Verify the "Generate visualization plots" checkbox is enabled
-
-5. **Custom model not working**
-   - Ensure the model file is in `.pkl` format
-   - Check that the model is compatible with the PyPotteryInk architecture
-   - Verify the file was uploaded successfully before processing
+Your support helps maintain and improve this open-source tool for the archaeological community!
 
 ---
+
+Developed with ❤️ by [Lorenzo Cardarelli](https://github.com/lrncrd) · Based on [img2img-turbo](https://github.com/GaParmar/img2img-turbo) by GaParmar — the original code was released under the MIT Licence; the changes made in this fork are released under the Apache License 2.0.
