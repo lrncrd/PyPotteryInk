@@ -281,7 +281,7 @@ body {
 .app-header {
     background: #ffffff;
     border-radius: var(--radius-md);
-    padding: 24px 30px;
+    padding: 1.15rem 1.75rem;
     margin-bottom: 24px;
     box-shadow: var(--shadow-card);
     border: 1px solid var(--border);
@@ -291,7 +291,8 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 0;
+    width: 100%;
 }
 
 .logo-section {
@@ -301,8 +302,8 @@ body {
 }
 
 .logo {
-    width: 76px;
-    height: 76px;
+    width: 56px;
+    height: 56px;
     object-fit: contain;
     border-radius: var(--radius-md);
     filter: drop-shadow(0 2px 6px rgba(194, 65, 12, 0.12));
@@ -321,7 +322,44 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.brand-accent {
+    color: var(--primary);
+}
+
+.header-brand-title {
+    font-size: 1.95rem;
+    color: var(--text-main);
+    font-weight: 700;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
     letter-spacing: -0.02em;
+}
+
+.header-info-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #ffffff;
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm, 6px);
+    padding: 7px 14px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.header-info-btn:hover {
+    background: var(--bg-surface);
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: translateY(-1px);
 }
 
 /* Mandated by PRODUCT.md: Optical and vertical centering with headline text */
@@ -1633,7 +1671,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(28, 25, 23, 0.65);
+    background: rgba(28, 25, 23, 0.45);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     z-index: 9999;
@@ -1713,32 +1751,165 @@ body {
     overflow-y: auto;
 }
 
+/* Standardized Modal Typography & Logo Huge */
+.modal-logo-huge {
+    max-width: 200px;
+    height: auto;
+    max-height: 140px;
+    object-fit: contain;
+    margin: 0 auto 16px auto;
+    display: block;
+    filter: drop-shadow(0 8px 20px rgba(194, 65, 12, 0.18));
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-logo-huge:hover {
+    transform: scale(1.04) rotate(-1deg);
+}
+
+.modal-app-title {
+    font-size: 1.85rem;
+    font-weight: 800;
+    color: var(--text-main);
+    margin-bottom: 4px;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+}
+
+.modal-author {
+    font-size: 0.95rem;
+    color: var(--text-muted, #78716c);
+    margin-bottom: 12px;
+}
+
+.modal-author strong {
+    color: var(--text-main);
+}
+
+.modal-desc {
+    color: var(--text-muted, #57534e);
+    font-size: 0.92rem;
+    line-height: 1.5;
+    max-width: 480px;
+    margin: 0 auto 18px auto;
+}
+
+/* Elegant System Hardware List */
+.system-specs-list {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 8px);
+    margin-bottom: 20px;
+    overflow: hidden;
+    text-align: left;
+}
+
+.spec-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    font-size: 0.88rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.spec-row:last-child {
+    border-bottom: none;
+}
+
+.spec-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--text-dim, #57534e);
+}
+
+.spec-label i {
+    font-size: 1rem;
+    color: var(--primary);
+}
+
+.spec-value {
+    font-family: var(--font-mono, monospace);
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--text-main);
+}
+
+.spec-value.spec-gpu-active {
+    color: #15803d;
+}
+
+.spec-value.spec-cpu-only {
+    color: #b45309;
+}
+
+/* Action Buttons Grid */
+.modal-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 22px;
+}
+
+.action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm, 6px);
+    font-size: 0.84rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    border: 1px solid var(--border);
+}
+
+.btn-docs {
+    background: #ffffff;
+    color: var(--text-main);
+}
+
+.btn-docs:hover {
+    background: var(--bg-surface);
+    border-color: #cbd5e1;
+    color: var(--text-main);
+    transform: translateY(-1px);
+}
+
+.btn-github {
+    background: #24292f;
+    color: #ffffff;
+    border-color: #24292f;
+}
+
+.btn-github:hover {
+    background: #1b1f23;
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.btn-kofi {
+    background: #ff5e5b;
+    color: #ffffff;
+    border-color: #ff5e5b;
+}
+
+.btn-kofi:hover {
+    background: #e04b48;
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+/* Fallbacks for backward compatibility */
 .about-hero {
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
     margin-bottom: 20px;
-}
-
-.about-logo-wrapper {
-    width: 110px;
-    height: 110px;
-    border-radius: 16px;
-    background: var(--primary-soft);
-    border: 1px solid var(--primary-border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 14px;
-    margin-bottom: 12px;
-    box-shadow: 0 4px 14px rgba(194, 65, 12, 0.1);
-}
-
-.about-logo {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
 }
 
 .about-author {
@@ -1760,13 +1931,6 @@ body {
     border: 1px solid var(--primary-border);
 }
 
-.about-description {
-    text-align: center;
-    margin-bottom: 20px;
-    line-height: 1.6;
-    color: var(--text-dim);
-    font-size: 0.92rem;
-}
 
 /* Disclosure & Citation Card */
 .disclosure-section {
@@ -2052,4 +2216,235 @@ body {
 @keyframes bubbleGlow {
     0%, 100% { box-shadow: 0 4px 12px rgba(194, 65, 12, 0.25); }
     50% { box-shadow: 0 4px 20px rgba(194, 65, 12, 0.45); }
+}
+
+/* --------------------------------------------------------------------------
+   17. Info Modal (macOS Minimal Centered Sheet)
+   -------------------------------------------------------------------------- */
+#info-modal.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(28, 25, 23, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+#info-modal .modal-content.mac-window,
+.mac-window {
+    background: #ffffff;
+    border-radius: 18px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    color: #1d1d1f;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.mac-titlebar {
+    padding: 14px 18px 6px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: transparent;
+    border: none;
+}
+
+.mac-window-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #86868b;
+    letter-spacing: 0.01em;
+}
+
+.mac-titlebar .btn-close,
+.mac-titlebar .modal-close {
+    background: transparent url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23515154'%3e%3cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z'/%3e%3c/svg%3e") center/0.75rem auto no-repeat;
+    border: none;
+    width: 24px;
+    height: 24px;
+    opacity: 0.45;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+    padding: 0;
+    margin: 0;
+}
+
+.mac-titlebar .btn-close:hover,
+.mac-titlebar .modal-close:hover {
+    opacity: 0.95;
+}
+
+.mac-v-body {
+    padding: 4px 24px 22px 24px;
+    text-align: center;
+}
+
+/* Free-standing prominent logo (no bounding box, natural drop shadow) */
+.modal-logo-free {
+    height: 125px;
+    width: auto;
+    max-width: 175px;
+    object-fit: contain;
+    margin: 0 auto 10px;
+    display: block;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    filter: drop-shadow(0 6px 20px rgba(194, 65, 12, 0.24));
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-logo-free:hover {
+    transform: scale(1.05);
+}
+
+.mac-v-title {
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 2px;
+    line-height: 1.2;
+    color: #1d1d1f;
+}
+
+.mac-v-meta {
+    font-size: 0.80rem;
+    color: #86868b;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.mac-v-desc {
+    font-size: 0.78rem;
+    color: #515154;
+    line-height: 1.4;
+    margin: 0 auto 12px;
+    max-width: 420px;
+}
+
+/* Apple Chip Hardware Pill */
+.mac-v-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.035);
+    border-radius: 9999px;
+    padding: 4px 14px;
+    font-size: 0.74rem;
+    color: #515154;
+    margin-bottom: 12px;
+}
+
+.mac-v-chip .chip-sep {
+    color: #c7c7cc;
+}
+
+.mac-v-chip .chip-active {
+    color: #15803d;
+    font-weight: 600;
+}
+
+.mac-v-chip .chip-cpu-only {
+    color: #b45309;
+    font-weight: 600;
+}
+
+/* Minimal Citation Callout */
+.mac-citation-strip {
+    background: rgba(0, 0, 0, 0.025);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 10px;
+    padding: 9px 14px;
+    text-align: left;
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.mac-citation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.mac-citation-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #86868b;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.mac-copy-link {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--primary);
+    background: transparent;
+    border: none;
+    padding: 2px 7px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mac-copy-link:hover {
+    background: var(--primary-soft);
+}
+
+.mac-copy-link.copied {
+    color: #059669;
+    background: #ecfdf5;
+}
+
+.mac-citation-quote {
+    font-size: 0.73rem;
+    color: #515154;
+    line-height: 1.35;
+    margin: 0;
+    font-style: italic;
+}
+
+/* Apple Unified Pill Action Buttons */
+.mac-v-actions {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 0;
+}
+
+.mac-pill {
+    background: rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.07);
+    color: #1d1d1f;
+    padding: 6px 16px;
+    border-radius: 9999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+}
+
+.mac-pill:hover {
+    background: rgba(0, 0, 0, 0.08);
+    color: #000000;
+    transform: translateY(-1px);
 }

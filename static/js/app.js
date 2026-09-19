@@ -1067,56 +1067,105 @@ function initImageUpload(areaId, inputId, previewId) {
     }
 }
 
-// Initialize all upload areas & Pixel Attention Mode on load
+// Initialize all upload areas on load
 document.addEventListener('DOMContentLoaded', function () {
     initImageUpload('stats-upload-area', 'stats-image-upload', 'stats-preview');
     initImageUpload('preprocess-upload-area', 'preprocess-image-upload', 'preprocess-preview');
     initImageUpload('diag-upload-area', 'diag-image-upload', 'diag-preview');
     initImageUpload('process-upload-area', 'process-image-upload', 'process-preview');
-
-    // Initialize Pixel Attention Mode for Info Button / Disclaimer
-    initPixelAttention();
 });
 
-function initPixelAttention() {
-    const pixelContainer = document.getElementById('pixel-container');
-    const pixelBubble = document.getElementById('pixel-speech-bubble');
-    const infoBtn = document.getElementById('info-btn');
-
-    if (!pixelContainer || !infoBtn) return;
-
-    // Enable attention mode on launch
-    pixelContainer.classList.add('attention-mode');
-    if (pixelBubble) {
-        pixelBubble.innerHTML = 'Read Disclaimer! <i class="bi bi-arrow-right-short"></i>';
-    }
-    infoBtn.classList.add('info-pulse-attention');
-
-    // Stop attention mode when user clicks the Info button
-    infoBtn.addEventListener('click', function stopAttention() {
-        pixelContainer.classList.remove('attention-mode');
-        if (pixelBubble) {
-            pixelBubble.textContent = 'Need help?';
+// Copy Citation Helper Function
+window.copyCitation = function (elementId = 'citation-text', btnElement) {
+    const textEl = document.getElementById(elementId);
+    if (!textEl) return;
+    const text = (textEl.innerText || textEl.textContent).replace(/^"|"$/g, '').trim();
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = btnElement || (window.event && window.event.target ? window.event.target.closest('.mac-copy-link') : null) || document.querySelector('.mac-copy-link');
+        if (btn) {
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check2"></i> Copied!';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.classList.remove('copied');
+            }, 2000);
         }
-        infoBtn.classList.remove('info-pulse-attention');
+    }).catch(err => {
+        console.error('Failed to copy citation:', err);
     });
+};
+
+// Fetch System Hardware Information
+function fetchSystemInfo() {
+    const cpuEl = document.getElementById('systemCPU');
+    const gpuEl = document.getElementById('systemGPU');
+    if (!cpuEl || !gpuEl) return;
+
+    fetch('/api/system-info')
+        .then(res => res.json())
+        .then(data => {
+            const cores = (data.cpu && data.cpu.cores) || data.cpu_count || 1;
+            const platform = (data.cpu && data.cpu.platform) || data.platform || '';
+            cpuEl.innerHTML = `<i class="bi bi-cpu me-1"></i> ${cores} Cores${platform ? ` (${platform})` : ''}`;
+
+            const cuda = (data.gpu && data.gpu.cuda_available) || data.cuda_available;
+            const gpuNames = (data.gpu && data.gpu.gpu_names) || (data.cuda_device_name ? [data.cuda_device_name] : []);
+            const mps = (data.mps && data.mps.mps_available) || data.mps_available;
+
+            if (cuda) {
+                const name = gpuNames.length > 0 ? gpuNames[0] : 'NVIDIA CUDA';
+                gpuEl.innerHTML = `<i class="bi bi-gpu-card me-1"></i> ${name} (CUDA)`;
+                gpuEl.className = 'chip-active';
+            } else if (mps) {
+                gpuEl.innerHTML = `<i class="bi bi-gpu-card me-1"></i> Apple Silicon (MPS)`;
+                gpuEl.className = 'chip-active';
+            } else {
+                gpuEl.innerHTML = `<i class="bi bi-gpu-card me-1"></i> CPU Only`;
+                gpuEl.className = 'chip-cpu-only';
+            }
+        })
+        .catch(err => {
+            console.error('Failed to load system info:', err);
+            cpuEl.innerHTML = '<i class="bi bi-cpu me-1"></i> Available';
+            gpuEl.innerHTML = '<i class="bi bi-gpu-card me-1"></i> CPU Only';
+            gpuEl.className = 'chip-cpu-only';
+        });
 }
 
 // Info Modal
-document.getElementById('info-btn').addEventListener('click', function () {
-    document.getElementById('info-modal').style.display = 'flex';
-});
+const infoBtnEl = document.getElementById('info-btn');
+const infoModalEl = document.getElementById('info-modal');
+const closeInfoModalEl = document.getElementById('close-info-modal');
 
-document.getElementById('close-info-modal').addEventListener('click', function () {
-    document.getElementById('info-modal').style.display = 'none';
-});
+if (infoBtnEl && infoModalEl) {
+    infoBtnEl.addEventListener('click', function () {
+        infoModalEl.style.display = 'flex';
+        fetchSystemInfo();
+    });
+}
 
-// Close modal when clicking outside
-document.getElementById('info-modal').addEventListener('click', function (e) {
-    if (e.target === this) {
-        this.style.display = 'none';
-    }
-});
+if (closeInfoModalEl && infoModalEl) {
+    closeInfoModalEl.addEventListener('click', function () {
+        infoModalEl.style.display = 'none';
+    });
+}
+
+if (infoModalEl) {
+    // Close modal when clicking outside
+    infoModalEl.addEventListener('click', function (e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+        }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && infoModalEl.style.display === 'flex') {
+            infoModalEl.style.display = 'none';
+        }
+    });
+}
 
 // Custom Model Selection Handler - Processing Tab
 document.getElementById('process-model-select').addEventListener('change', function () {
@@ -1231,24 +1280,64 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
     }
 });
 
-// Copy Citation Helper Function
-function copyCitation() {
-    const citationBox = document.getElementById('citation-text');
-    if (!citationBox) return;
-    const textToCopy = citationBox.innerText || citationBox.textContent;
-    
-    navigator.clipboard.writeText(textToCopy).then(() => {
-        const btn = document.getElementById('copy-citation-btn');
-        if (btn) {
-            btn.classList.add('copied');
-            btn.innerHTML = '<i class="bi bi-check2"></i> Copied!';
-            setTimeout(() => {
-                btn.classList.remove('copied');
-                btn.innerHTML = '<i class="bi bi-clipboard"></i> Copy Citation';
-            }, 2000);
-        }
-    }).catch(err => {
-        console.error('Failed to copy citation:', err);
+
+// ==========================================
+// Auto-Shutdown Heartbeat & Beacon System
+// ==========================================
+(function initAutoShutdownBeacon() {
+    const tabSessionId = 'tab_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+    const HEARTBEAT_INTERVAL_MS = 2500;
+
+    function sendHeartbeat() {
+        fetch('/api/heartbeat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tab_id: tabSessionId }),
+            keepalive: true
+        }).catch(() => {});
+    }
+
+    // Ping iniziale immediato
+    sendHeartbeat();
+
+    // Ping periodico
+    const intervalId = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
+
+    // Re-ping al ritorno del focus sulla scheda
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') sendHeartbeat();
     });
-}
+    window.addEventListener('focus', sendHeartbeat);
+
+    // 1. Finestra di conferma alla chiusura della scheda o del browser
+    window.addEventListener('beforeunload', (e) => {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+    });
+
+    // 2. Invio del beacon SOLO quando l'utente ha effettivamente confermato l'uscita
+    let beaconSent = false;
+    function sendShutdownBeacon() {
+        if (beaconSent) return;
+        beaconSent = true;
+        clearInterval(intervalId);
+        const payload = JSON.stringify({ tab_id: tabSessionId });
+
+        if (navigator.sendBeacon) {
+            const blob = new Blob([payload], { type: 'application/json' });
+            navigator.sendBeacon('/api/beacon_shutdown', blob);
+        } else {
+            fetch('/api/beacon_shutdown', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: payload,
+                keepalive: true
+            }).catch(() => {});
+        }
+    }
+
+    window.addEventListener('pagehide', sendShutdownBeacon);
+    window.addEventListener('unload', sendShutdownBeacon);
+})();
 

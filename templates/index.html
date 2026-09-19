@@ -14,7 +14,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ version }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ version }}&t=20260919">
 </head>
 
 <body>
@@ -55,16 +55,14 @@
             <div class="header-top">
                 <div class="logo-section">
                     <img src="{{ url_for('static', filename='images/LogoInk.png') }}" alt="PyPotteryInk Logo" class="logo">
-                    <div>
-                        <h1>PyPotteryInk <span class="version-badge">v{{ version }}</span></h1>
-                    </div>
+                    <h1 class="header-brand-title">PyPottery<span class="brand-accent">Ink</span> <span class="version-badge">v{{ version }}</span></h1>
                 </div>
                 <div class="header-actions">
                     <a href="https://lrncrd.github.io/PyPottery/pypotteryink/usage.html" target="_blank"
-                        class="pixel-assistant-container attention-mode" id="pixel-container" title="Need help? Read documentation & disclaimer">
-                        <div class="pixel-speech-bubble" id="pixel-speech-bubble">Read Disclaimer! <i class="bi bi-arrow-right-short"></i></div>
+                        class="pixel-assistant-container" id="pixel-container" title="Need help? Read documentation & disclaimer">
+                        <div class="pixel-speech-bubble" id="pixel-speech-bubble">Need help?</div>
                         <!-- SVG Icon -->
-                        <svg width="60" height="60" viewBox="30 45 180 140" aria-hidden="true">
+                        <svg width="45" height="45" viewBox="30 45 180 140" aria-hidden="true">
                             <g id="pixel-monitor">
                                 <!-- Monitor Body -->
                                 <rect x="40" y="50" width="160" height="130" rx="15" ry="15" fill="#d0d0d0"
@@ -94,13 +92,10 @@
                             </g>
                         </svg>
                     </a>
-                    <button id="info-btn" class="icon-btn" aria-label="About & Info" title="About & Info">
-                        <i class="bi bi-info-circle"></i>
+                    <button id="info-btn" class="header-info-btn" aria-label="About & Info" title="About & Info">
+                        <i class="bi bi-info-circle me-1"></i> Info
                     </button>
                 </div>
-            </div>
-            <div class="header-subtitle">
-                A deep learning tool for automating the digital inking process of archaeological pottery drawings
             </div>
         </header>
 
@@ -124,56 +119,66 @@
             </button>
         </div>
 
-        <!-- Info Modal -->
+        <!-- Info Modal (macOS Minimal Centered Sheet) -->
         <div id="info-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="about-modal-title">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 id="about-modal-title"><i class="bi bi-info-circle-fill" style="color: var(--primary);"></i> About PyPotteryInk</h2>
-                    <button class="modal-close" id="close-info-modal" aria-label="Close modal"><i class="bi bi-x-lg"></i></button>
+            <div class="modal-content mac-window" style="max-width: 500px;">
+                <!-- Titlebar without traffic lights, minimal close on top-right -->
+                <div class="mac-titlebar">
+                    <span class="mac-window-title" id="about-modal-title">About PyPotteryInk</span>
+                    <button class="btn-close modal-close" id="close-info-modal" aria-label="Close modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="about-hero">
-                        <div class="about-logo-wrapper">
-                            <img src="{{ url_for('static', filename='images/LogoInk.png') }}" alt="PyPotteryInk Logo" class="about-logo">
-                        </div>
-                        <h3 class="about-author">Lorenzo Cardarelli</h3>
-                        <span class="version-pill">v{{ version }}</span>
+
+                <div class="mac-v-body">
+                    <!-- Logo (free-standing, 125px) -->
+                    <img src="{{ url_for('static', filename='images/LogoInk.png') }}" alt="PyPotteryInk Logo" class="modal-logo-free">
+
+                    <!-- Title -->
+                    <h2 class="mac-v-title">
+                        PyPottery<span class="brand-accent">Ink</span>
+                    </h2>
+
+                    <!-- Clean Meta Line -->
+                    <div class="mac-v-meta">
+                        Version {{ version }} • By <strong class="text-dark">Lorenzo Cardarelli</strong>
                     </div>
 
-                    <div class="about-description">
-                        <p><strong>PyPotteryInk</strong> is a Generative AI tool designed for translating archaeological pottery drawings into publication-ready illustrations.</p>
+                    <!-- Description -->
+                    <p class="mac-v-desc">
+                        A deep learning tool for automating the digital inking process of archaeological pottery drawings.
+                    </p>
+
+                    <!-- Hardware Chip Pill -->
+                    <div>
+                        <div class="mac-v-chip" id="modalHardwareChip">
+                            <span id="systemCPU"><i class="bi bi-cpu me-1"></i> Detecting...</span>
+                            <span class="chip-sep">•</span>
+                            <span id="systemGPU" class="chip-active"><i class="bi bi-gpu-card me-1"></i> Detecting...</span>
+                        </div>
                     </div>
 
-                    <div class="disclosure-section">
-                        <div class="disclosure-header">
-                            <i class="bi bi-shield-check"></i>
-                            <h4>DISCLOSURE REQUIREMENT</h4>
-                        </div>
-                        <p>When publishing or presenting results that use PyPotteryInk, please include:</p>
-                        <ul class="disclosure-list">
-                            <li><span class="list-num">1</span> The version of PyPotteryInk used (e.g. <code>v{{ version }}</code>)</li>
-                            <li><span class="list-num">2</span> The specific model used (e.g. <code>10k Model</code> or <code>6h-MCG Model</code>)</li>
-                            <li><span class="list-num">3</span> The number of images processed</li>
-                        </ul>
-
-                        <div class="citation-header">
-                            <span>Suggested citation format:</span>
-                            <button type="button" id="copy-citation-btn" class="btn-copy-citation" onclick="copyCitation()">
-                                <i class="bi bi-clipboard"></i>
-                                Copy Citation
+                    <!-- Minimal Citation Callout -->
+                    <div class="mac-citation-strip mb-3">
+                        <div class="mac-citation-header">
+                            <span class="mac-citation-tag"><i class="bi bi-quote"></i> Citation</span>
+                            <button type="button" class="mac-copy-link" onclick="copyCitation('citation-text', this)">
+                                <i class="bi bi-clipboard"></i> Copy
                             </button>
                         </div>
-                        <div class="citation-box" id="citation-text">"This research utilized PyPotteryInk (version {{ version }}) for the AI-assisted translation of [number] pottery drawings. PyPotteryInk is a generative AI tool developed by Lorenzo Cardarelli (https://github.com/lrncrd/PyPotteryInk)."</div>
+                        <p class="mac-citation-quote" id="citation-text">
+                            "This research utilized PyPotteryInk (version {{ version }}) for generative digital inking of archaeological ceramics. Developed by Lorenzo Cardarelli (https://github.com/lrncrd/PyPotteryInk)."
+                        </p>
                     </div>
 
-                    <div class="about-links">
-                        <a href="https://github.com/lrncrd/PyPotteryInk" target="_blank" rel="noopener noreferrer" class="about-link-btn primary">
-                            <i class="bi bi-github"></i>
-                            GitHub Repository
+                    <!-- Apple-style Pill Action Buttons -->
+                    <div class="mac-v-actions">
+                        <a href="https://lrncrd.github.io/PyPottery/pypotteryink/usage.html" target="_blank" class="mac-pill">
+                            <i class="bi bi-book"></i> Documentation
                         </a>
-                        <a href="https://huggingface.co/lrncrd/PyPotteryInk" target="_blank" rel="noopener noreferrer" class="about-link-btn secondary">
-                            <i class="bi bi-box-arrow-up-right"></i>
-                            HuggingFace Models
+                        <a href="https://github.com/lrncrd/PyPotteryInk" target="_blank" class="mac-pill">
+                            <i class="bi bi-github"></i> GitHub
+                        </a>
+                        <a href="https://ko-fi.com/lrncrd" target="_blank" class="mac-pill">
+                            <i class="bi bi-cup-hot"></i> Support
                         </a>
                     </div>
                 </div>
@@ -612,7 +617,7 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}&t=20260919"></script>
 </body>
 
 </html>
