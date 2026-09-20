@@ -389,6 +389,8 @@ function showDiagnosticsComplete(files, outputContainer, gallery) {
     gallery.innerHTML = '';
     files.forEach(file => {
         const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.decoding = 'async';
         img.src = `/api/get-image/diagnostics/${file}`;
         img.alt = file;
         img.onclick = function () { openLightbox(this.src); };
@@ -397,17 +399,28 @@ function showDiagnosticsComplete(files, outputContainer, gallery) {
     gallery.style.display = 'grid';
 }
 
-// Open diagnostics folder
-async function openDiagnosticsFolder() {
+// Open a folder in the system file manager (same route for Diagnostics and Batch Processing)
+async function openFolder(folderPath) {
     try {
         await fetch('/api/open-folder', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folder_path: 'temp_diagnostics' })
+            body: JSON.stringify({ folder_path: folderPath })
         });
     } catch (error) {
         console.error('Failed to open folder:', error);
     }
+}
+
+// Open diagnostics folder
+function openDiagnosticsFolder() {
+    return openFolder('temp_diagnostics');
+}
+
+// Open the output folder of the last batch run (kept in a variable: a Windows path does not survive an inline onclick)
+let lastBatchOutputDir = null;
+function openBatchOutputFolder() {
+    if (lastBatchOutputDir) return openFolder(lastBatchOutputDir);
 }
 
 // Lightbox functions
@@ -857,6 +870,8 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
                 html += `<p><strong><i class="bi bi-x-circle-fill" style="color: var(--danger-color);"></i> Failed:</strong> ${results.failed} images</p>`;
                 html += `<p><strong><i class="bi bi-stopwatch"></i> Average time:</strong> ${results.average_time.toFixed(2)}s per image</p>`;
                 html += `<p><strong><i class="bi bi-folder2-open"></i> Output directory:</strong> <code>${results.output_dir}</code></p>`;
+                lastBatchOutputDir = results.output_dir;
+                html += `<button class="btn btn-open-folder" type="button" onclick="openBatchOutputFolder()"><i class="bi bi-folder2-open"></i> Open Output Folder</button>`;
 
                 if (results.log_file) {
                     html += `<p><strong><i class="bi bi-file-earmark-text"></i> Log file:</strong> <code>${results.log_file}</code></p>`;
@@ -873,6 +888,8 @@ document.getElementById('process-images-btn').addEventListener('click', async fu
 
                     results.comparison_images.slice(0, 20).forEach(file => {
                         const img = document.createElement('img');
+                        img.loading = 'lazy';
+                        img.decoding = 'async';
                         img.src = `/api/get-image/comparisons/${file}`;
                         img.alt = file;
                         img.onclick = function () { openLightbox(this.src); };
@@ -939,6 +956,13 @@ function initImageUpload(areaId, inputId, previewId) {
     if (!uploadArea || !fileInput || !previewContainer) return;
 
     let selectedFiles = [];
+    let selectionId = 0;                 // bumps on every new selection, stale thumbnail jobs stop
+    const thumbCache = new Map();        // File -> thumbnail canvas (null when it could not be decoded)
+    const thumbsInFlight = new Set();
+    const tileByFile = new Map();
+    const MAX_PREVIEW_TILES = 60;
+    const THUMB_WIDTH = 240;
+    const THUMB_CONCURRENCY = 4;
 
     // Click to upload
     uploadArea.addEventListener('click', function (e) {
@@ -974,83 +998,161 @@ function initImageUpload(areaId, inputId, previewId) {
         handleFiles(files);
     });
 
+    // Preview of the selected files. With hundreds of scans the old version read every file as a full-size
+    // base64 image and rebuilt the whole grid on every removal. Now: small bitmaps (decoded off the main
+    // thread, 4 at a time), at most MAX_PREVIEW_TILES tiles, one delegated remove handler.
     function handleFiles(files) {
         selectedFiles = Array.from(files);
+        selectionId++;
+        thumbCache.clear();
+        syncFileInput();
+        renderPreview();
+    }
 
-        if (selectedFiles.length === 0) {
-            previewContainer.style.display = 'none';
-            uploadArea.querySelector('.upload-placeholder').style.display = 'flex';
-            return;
-        }
-
-        // Update the file input
+    function syncFileInput() {
         const dataTransfer = new DataTransfer();
         selectedFiles.forEach(file => dataTransfer.items.add(file));
         fileInput.files = dataTransfer.files;
+    }
 
-        // Show preview
+    function isTiffFile(file) {
+        const name = file.name.toLowerCase();
+        return name.endsWith('.tif') || name.endsWith('.tiff');
+    }
+
+    function placeholderThumb(label) {
+        const box = document.createElement('div');
+        box.className = 'tiff-placeholder preview-thumb';
+        box.innerHTML = '<div class="tiff-icon"><i class="bi bi-file-earmark-image"></i></div><div class="tiff-label"></div>';
+        box.querySelector('.tiff-label').textContent = label;
+        return box;
+    }
+
+    function fileLabel(file) {
+        const dot = file.name.lastIndexOf('.');
+        return dot >= 0 ? file.name.slice(dot + 1).toUpperCase() : 'IMG';
+    }
+
+    function buildTile(file, index) {
+        const item = document.createElement('div');
+        item.className = 'preview-item';
+
+        const cached = thumbCache.get(file);
+        if (cached) {
+            item.appendChild(cached);
+        } else if (cached === null || isTiffFile(file)) {
+            item.appendChild(placeholderThumb(fileLabel(file)));
+        } else {
+            const pending = document.createElement('div');
+            pending.className = 'preview-thumb preview-thumb-pending';
+            item.appendChild(pending);
+        }
+
+        const name = document.createElement('div');
+        name.className = 'preview-item-name';
+        name.textContent = file.name;
+        item.appendChild(name);
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'preview-item-remove';
+        remove.dataset.index = index;
+        remove.setAttribute('aria-label', 'Remove image');
+        remove.innerHTML = '<i class="bi bi-x"></i>';
+        item.appendChild(remove);
+        return item;
+    }
+
+    function renderPreview() {
+        if (selectedFiles.length === 0) {
+            previewContainer.replaceChildren();
+            previewContainer.style.display = 'none';
+            uploadArea.querySelector('.upload-placeholder').style.display = 'flex';
+            updateButtonStates(areaId);
+            return;
+        }
+
         uploadArea.querySelector('.upload-placeholder').style.display = 'none';
         previewContainer.style.display = 'grid';
-        previewContainer.innerHTML = '';
 
-        selectedFiles.forEach((file, index) => {
-            const previewItem = document.createElement('div');
-            previewItem.className = 'preview-item';
-
-            // Check if file is a TIFF
-            const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
-
-            if (isTiff) {
-                // Show placeholder for TIFF files
-                previewItem.innerHTML = `
-                    <div class="tiff-placeholder">
-                        <div class="tiff-icon"><i class="bi bi-file-earmark-image"></i></div>
-                        <div class="tiff-label">TIFF</div>
-                    </div>
-                    <div class="preview-item-name">${file.name}</div>
-                    <button class="preview-item-remove" data-index="${index}" aria-label="Remove image"><i class="bi bi-x"></i></button>
-                `;
-                previewContainer.appendChild(previewItem);
-
-                // Remove button
-                previewItem.querySelector('.preview-item-remove').addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    removeFile(parseInt(this.getAttribute('data-index')));
-                });
-            } else {
-                // Show preview for other image formats
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    previewItem.innerHTML = `
-                        <img src="${e.target.result}" alt="${file.name}">
-                        <div class="preview-item-name">${file.name}</div>
-                        <button class="preview-item-remove" data-index="${index}" aria-label="Remove image"><i class="bi bi-x"></i></button>
-                    `;
-                    previewContainer.appendChild(previewItem);
-
-                    // Remove button
-                    previewItem.querySelector('.preview-item-remove').addEventListener('click', function (e) {
-                        e.stopPropagation();
-                        removeFile(parseInt(this.getAttribute('data-index')));
-                    });
-                };
-                reader.readAsDataURL(file);
-            }
+        const fragment = document.createDocumentFragment();
+        const visible = selectedFiles.slice(0, MAX_PREVIEW_TILES);
+        tileByFile.clear();
+        visible.forEach((file, index) => {
+            const tile = buildTile(file, index);
+            tileByFile.set(file, tile);
+            fragment.appendChild(tile);
         });
 
-        // Add upload count
+        const hidden = selectedFiles.length - visible.length;
+        if (hidden > 0) {
+            const more = document.createElement('div');
+            more.className = 'preview-item preview-more';
+            more.textContent = `+${hidden} more`;
+            fragment.appendChild(more);
+        }
+
         const countDiv = document.createElement('div');
         countDiv.className = 'upload-count';
         countDiv.textContent = `${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''} selected`;
-        previewContainer.appendChild(countDiv);
+        fragment.appendChild(countDiv);
 
-        // Enable buttons based on upload area
+        previewContainer.replaceChildren(fragment);
+        loadThumbnails(visible);
         updateButtonStates(areaId);
     }
 
+    async function makeThumbnail(file) {
+        const bitmap = await createImageBitmap(file, { resizeWidth: THUMB_WIDTH, resizeQuality: 'low' });
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        canvas.getContext('2d').drawImage(bitmap, 0, 0);
+        bitmap.close();
+        canvas.className = 'preview-thumb';
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label', file.name);
+        return canvas;
+    }
+
+    // Decode the missing thumbnails of the visible tiles, a few at a time
+    function loadThumbnails(visibleFiles) {
+        const queue = visibleFiles.filter(f => !isTiffFile(f) && !thumbCache.has(f) && !thumbsInFlight.has(f));
+        const mySelection = selectionId;
+
+        const worker = async () => {
+            while (queue.length > 0 && mySelection === selectionId) {
+                const file = queue.shift();
+                thumbsInFlight.add(file);
+                let thumb = null;
+                try {
+                    thumb = await makeThumbnail(file);
+                } catch (err) {
+                    // unreadable or unsupported: the tile keeps the file-type placeholder
+                }
+                thumbsInFlight.delete(file);
+                if (mySelection !== selectionId) return;
+                thumbCache.set(file, thumb);
+                const tile = tileByFile.get(file);
+                const slot = tile && tile.querySelector('.preview-thumb');
+                if (slot) slot.replaceWith(thumb || placeholderThumb(fileLabel(file)));
+            }
+        };
+        for (let i = 0; i < THUMB_CONCURRENCY; i++) worker();
+    }
+
+    previewContainer.addEventListener('click', function (e) {
+        const btn = e.target.closest('.preview-item-remove');
+        if (!btn) return;
+        e.stopPropagation();
+        removeFile(parseInt(btn.dataset.index, 10));
+    });
+
     function removeFile(index) {
-        selectedFiles.splice(index, 1);
-        handleFiles(selectedFiles);
+        const [removed] = selectedFiles.splice(index, 1);
+        thumbCache.delete(removed);
+        syncFileInput();
+        renderPreview();
     }
 
     function updateButtonStates(areaId) {
