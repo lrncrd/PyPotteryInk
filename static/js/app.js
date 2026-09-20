@@ -516,7 +516,8 @@ document.getElementById('calculate-stats-btn').addEventListener('click', async f
 // Preprocessing
 document.getElementById('preprocess-btn').addEventListener('click', async function () {
     const files = document.getElementById('preprocess-image-upload').files;
-    const useCalculatedStats = document.getElementById('use-calculated-stats').checked;
+    // The "use calculated statistics" checkbox was removed from the page: the stats file is always required
+    const useCalculatedStats = false;
     const outputDir = document.getElementById('preprocess-output-dir').value;
 
     const btn = this;
@@ -544,7 +545,7 @@ document.getElementById('preprocess-btn').addEventListener('click', async functi
         if (!useCalculatedStats) {
             const statsFile = document.getElementById('stats-file-upload').files[0];
             if (!statsFile) {
-                throw new Error('Please select a statistics file (.npy) or check "Use calculated statistics"');
+                throw new Error('Please select a statistics file (.npy)');
             }
 
             const statsFormData = new FormData();
