@@ -4,6 +4,7 @@ import matplotlib
 matplotlib.use('Agg')  # Must be before importing pyplot
 import matplotlib.pyplot as plt
 from PIL import Image
+from pathlib import Path
 
 def visualize_patches(image_path_or_pil, patch_size=512, overlap=64, save_path=None):
     """
@@ -133,12 +134,22 @@ def visualize_patches(image_path_or_pil, patch_size=512, overlap=64, save_path=N
         plt.show()
 
 
+def _read_version(default="unknown"):
+    """Read the release version from the VERSION file next to this module (bumped
+    automatically by the auto-release workflow), so the disclosure reminder always
+    quotes the version that is actually installed."""
+    try:
+        return (Path(__file__).resolve().parent / "VERSION").read_text(encoding="utf-8").strip() or default
+    except OSError:
+        return default
+
+
 def print_disclosure_reminder():
     """
     Prints the AI disclosure reminder when PyPotteryInk is run.
     This function should be called at the beginning of the main execution.
     """
-    version = "2.1.0"  # Replace with version variable from your package
+    version = _read_version()
     
     print("\n" + "=" * 80)
     print(" 📢 PYPOTTERYINK AI DISCLOSURE REMINDER ".center(80, "="))
