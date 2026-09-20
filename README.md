@@ -95,7 +95,7 @@ Benchmarks per GPU are in the [Model Zoo](https://lrncrd.github.io/PyPottery/pyp
 4. *(Optional)* **Preprocess**: compute dataset statistics and apply suggested optimizations
 5. **Batch process** a folder of drawings and follow the real-time progress
 
-For the full walkthrough, see the **[Usage Guide](https://lrncrd.github.io/PyPottery/pypotteryink/usage.html)**. Something not working? See [Installation](https://lrncrd.github.io/PyPottery/pypotteryink/installation.html) and the troubleshooting notes in [Advanced](https://lrncrd.github.io/PyPottery/pypotteryink/advanced.html).
+For the full walkthrough, see the **[Usage Guide](https://lrncrd.github.io/PyPottery/pypotteryink/usage.html)**. Something not working? See the [Getting Started guide](https://lrncrd.github.io/PyPottery/pypotteryink/index.html#troubleshooting) and the tips in [Advanced](https://lrncrd.github.io/PyPottery/pypotteryink/advanced.html).
 
 ## 🤖 Available Models
 
