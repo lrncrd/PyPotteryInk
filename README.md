@@ -5,7 +5,7 @@
 <img src="imgs/LogoInk.png" width="250"/>
 
 [![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
+[![Open Source](https://img.shields.io/badge/Open%20Source-community--driven-green.svg)](https://lrncrd.github.io/PyPottery/community.html)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/lrncrd/PyPotteryInk)
 [![GPU Support](https://img.shields.io/badge/GPU-CUDA%20%7C%20MPS-green.svg)](https://github.com/lrncrd/PyPotteryInk)
 [![HuggingFace](https://img.shields.io/badge/🤗%20Models-PyPotteryInk-yellow.svg)](https://huggingface.co/lrncrd/PyPotteryInk)
@@ -179,4 +179,4 @@ Your support helps maintain and improve this open-source tool for the archaeolog
 
 ---
 
-Developed with ❤️ by [Lorenzo Cardarelli](https://github.com/lrncrd) · Based on [img2img-turbo](https://github.com/GaParmar/img2img-turbo) by GaParmar — the original code was released under the MIT Licence; the changes made in this fork are released under the Apache License 2.0.
+Developed with ❤️ by [Lorenzo Cardarelli](https://github.com/lrncrd) · Based on [img2img-turbo](https://github.com/GaParmar/img2img-turbo) by GaParmar — the original code is used under its own terms (MIT Licence), and its notice is kept in this repository.
