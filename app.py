@@ -56,9 +56,11 @@ import json
 from werkzeug.utils import secure_filename
 from PIL import Image
 import numpy as np
+import re
 import threading
 from queue import Queue
 
+import cloud
 from ink import process_folder, process_single_image
 from models import _MODELS_CACHE_DIR
 from preprocessing import DatasetAnalyzer, apply_recommended_adjustments, check_image_quality
@@ -315,7 +317,7 @@ def handle_beacon_shutdown():
 @app.route('/')
 def index():
     """Render the main page"""
-    return render_template('index.html', version=version, models=MODELS)
+    return render_template('index.html', version=version, models=MODELS, cloud=cloud.public_catalog())
 
 @app.route('/api/system-info')
 def get_system_info():
@@ -762,6 +764,97 @@ def process_images():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+# ---------------------------------------------------------------------------
+# Cloud inking (beta): generalist image models through OpenRouter. Parallel to
+# the local pix2pix-turbo workflow above, which it does not touch. The drawings
+# are sent to OpenRouter and the model provider; the API key lives only in the
+# arguments of the running batch (never in the session cookie, a file or a log).
+# ---------------------------------------------------------------------------
+cloud_cancels = {}
+
+@app.route('/api/cloud/catalog', methods=['GET'])
+def cloud_catalog():
+    return jsonify({"success": True, **cloud.public_catalog()})
+
+@app.route('/api/cloud/start', methods=['POST'])
+def cloud_start():
+    try:
+        data = request.json or {}
+        api_key = (data.get('api_key') or '').strip()
+        if not api_key:
+            return jsonify({"success": False, "error": "Enter your OpenRouter API key first."}), 400
+        if not data.get('consent'):
+            return jsonify({"success": False, "error": "Confirm that you agree to send the drawings to the provider."}), 400
+
+        model = (data.get('model') or '').strip()
+        if model == 'custom':
+            model = (data.get('custom_model') or '').strip()
+        if not re.fullmatch(r'[\w.\-]+/[\w.\-:]+', model):
+            return jsonify({"success": False, "error": "Invalid model id (expected provider/model)."}), 400
+        style = data.get('style', 'fine')
+        if style not in cloud.STYLES:
+            return jsonify({"success": False, "error": "Unknown style level."}), 400
+        try:
+            variants = max(1, min(int(data.get('variants', 1)), cloud.MAX_VARIANTS))
+            budget = float(data['budget_usd']) if data.get('budget_usd') not in (None, '') else None
+        except (TypeError, ValueError):
+            return jsonify({"success": False, "error": "Invalid variants or budget value."}), 400
+        if budget is not None and budget <= 0:
+            budget = None
+        extra = str(data.get('extra_prompt') or '')[:1000]
+        do_align = bool(data.get('align', True))
+        output_dir = data.get('output_dir') or './enhanced_pottery_cloud'
+
+        in_dir = Path(app.config['UPLOAD_FOLDER'])
+        n_images = len([p for p in in_dir.iterdir() if p.suffix.lower() in cloud.IMAGE_EXTS]) if in_dir.exists() else 0
+        if n_images == 0:
+            return jsonify({"success": False, "error": "Upload at least one drawing first."}), 400
+
+        os.makedirs(output_dir, exist_ok=True)
+        session['last_output_dir'] = output_dir
+
+        session_id = 'cloud' + str(int(time.time() * 1000))
+        progress_queues[session_id] = Queue()
+        cancel = threading.Event()
+        cloud_cancels[session_id] = cancel
+
+        def on_progress(snap):
+            total = max(snap['total'], 1)
+            progress_queues[session_id].put({
+                'progress': snap['done'] / total * 100,
+                'message': f"{snap['done']} of {snap['total']}",
+                'cloud': snap,
+            })
+
+        def run():
+            try:
+                results = cloud.run_batch(
+                    api_key=api_key, input_folder=str(in_dir), output_dir=output_dir, model=model,
+                    style=style, variants=variants, extra=extra, do_align=do_align, budget_usd=budget,
+                    progress=on_progress, cancel=cancel)
+                progress_queues[session_id].put({
+                    'progress': 100, 'message': 'Processing completed!', 'completed': True, 'results': results})
+            except Exception as e:
+                progress_queues[session_id].put({'progress': 0, 'message': f'Error: {e}', 'error': True})
+            finally:
+                cloud_cancels.pop(session_id, None)
+
+        threading.Thread(target=run, daemon=True).start()
+        return jsonify({
+            "success": True, "session_id": session_id, "images": n_images, "variants": variants,
+            "estimated_usd": cloud.estimate_cost(model, n_images, variants),
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/cloud/cancel/<session_id>', methods=['POST'])
+def cloud_cancel(session_id):
+    event = cloud_cancels.get(session_id)
+    if event is None:
+        return jsonify({"success": False, "error": "No running cloud batch with this id."}), 404
+    event.set()
+    return jsonify({"success": True})
+
 @app.route('/api/progress/<session_id>')
 def get_progress(session_id):
     """Get progress updates for a processing session"""
@@ -1146,6 +1239,9 @@ def get_image(folder, filename):
         
         if folder == 'output':
             image_path = os.path.join(output_dir, filename)
+        elif folder == 'input':
+            # the pencil drawings uploaded for the batch (cloud gallery shows them next to the ink)
+            image_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename))
         elif folder == 'diagnostics':
             image_path = os.path.join('temp_diagnostics', filename)
         elif folder == 'comparisons':

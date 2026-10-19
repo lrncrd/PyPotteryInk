@@ -114,6 +114,10 @@
                 <i class="bi bi-palette"></i>
                 <span class="tab-label">Batch Processing</span>
             </button>
+            <button class="tab-button" data-tab="cloud-tab">
+                <i class="bi bi-cloud-arrow-up"></i>
+                <span class="tab-label">Cloud Inking <span class="beta-chip">beta</span></span>
+            </button>
         </div>
 
         <!-- Info Modal (macOS Minimal Centered Sheet) -->
@@ -604,6 +608,256 @@
             </div>
         </div>
 
+        <!-- Tab 5: Cloud Inking (beta) -->
+        <div class="tab-content" id="cloud-tab"
+             data-est-usd='{ {% for m in cloud.models %}"{{ m.id }}": {{ m.est_usd }}{% if not loop.last %}, {% endif %}{% endfor %} }'
+             data-est-sec='{ {% for m in cloud.models %}"{{ m.id }}": {{ m.est_seconds }}{% if not loop.last %}, {% endif %}{% endfor %} }'
+             data-model-notes='{ {% for m in cloud.models %}{{ m.id|tojson }}: {{ m.note|tojson }}{% if not loop.last %}, {% endif %}{% endfor %} }'
+             data-max-variants="{{ cloud.max_variants }}">
+            <div class="panel">
+                <h2><i class="bi bi-cloud-arrow-up"></i> Cloud Inking <span class="beta-chip">beta</span></h2>
+                <p class="info-text">Ink pencil drawings with a general-purpose image model instead of the local one. No GPU and no model download are needed; you pay per image.</p>
+
+                <!-- Section 1: Privacy and connection -->
+                <div class="form-section cloud-gate">
+                    <div class="form-section-header">
+                        <h3 class="form-section-title"><i class="bi bi-shield-exclamation"></i> Before you start</h3>
+                    </div>
+
+                    <div class="cloud-privacy" role="note">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <p><strong>Your drawings leave this computer.</strong> Each image is sent to OpenRouter and to the company that runs the model. Do not use this mode for unpublished material you are not allowed to share. The local workflow in the other tabs stays fully offline.</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cloud-api-key">
+                            OpenRouter API key:
+                            <span class="info-tooltip"
+                                data-tooltip="The key is kept in memory for this session only. It is never saved to disk or logged, and it disappears when you close or reload the page."><i class="bi bi-info-circle"></i></span>
+                        </label>
+                        <div class="input-with-button">
+                            <input type="password" id="cloud-api-key" class="form-control" autocomplete="off"
+                                spellcheck="false" placeholder="sk-or-v1-...">
+                            <a href="{{ cloud.keys_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-small">
+                                <i class="bi bi-box-arrow-up-right"></i> Get a key
+                            </a>
+                        </div>
+                        <small class="cloud-hint">Kept in memory for this session only. Closing or reloading the page forgets it.</small>
+                    </div>
+
+                    <div class="form-checkbox-card">
+                        <label>
+                            <input type="checkbox" id="cloud-consent">
+                            <span>I understand that the drawings I process are sent to external providers.</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Section 2: Model and style -->
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <h3 class="form-section-title"><i class="bi bi-brush"></i> Model &amp; stippling style</h3>
+                    </div>
+
+                    <div class="form-group">
+                        <span class="cloud-label" id="cloud-style-label">Stippling style:</span>
+                        <div class="cloud-style-cards" role="radiogroup" aria-labelledby="cloud-style-label">
+                            {% for st in cloud.styles %}
+                            <label class="cloud-style-card">
+                                <input type="radio" name="cloud-style" value="{{ st.id }}" {% if loop.first %}checked{% endif %}>
+                                <span class="cloud-style-name">{{ st.label }}</span>
+                                <span class="cloud-style-desc">{{ st.description }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="form-grid-params cloud-model-row">
+                        <div class="form-group">
+                            <label for="cloud-model-select">
+                                Model:
+                                <span class="info-tooltip"
+                                    data-tooltip="GPT Image 2 gave the best results in our benchmark of 14 drawings. Other models were not tested for this task and were mostly worse."><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <select id="cloud-model-select" class="form-control">
+                                {% for m in cloud.models %}
+                                <option value="{{ m.id }}">{{ m.label }}{% if m.recommended %} (recommended){% endif %}</option>
+                                {% endfor %}
+                                <option value="custom">Other OpenRouter model...</option>
+                            </select>
+                            <small class="cloud-hint" id="cloud-model-note">{{ cloud.models[0].note }}</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="cloud-variants">
+                                Versions per drawing:
+                                <span class="info-tooltip"
+                                    data-tooltip="Every version is a separate paid call. The same drawing can come out differently each time, so a few versions let you pick the best."><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <input type="number" id="cloud-variants" value="1" min="1" max="{{ cloud.max_variants }}" step="1" class="form-control">
+                            <small class="cloud-hint">Files are saved as name_v1, name_v2...</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="cloud-custom-model-group" style="display: none;">
+                        <label for="cloud-custom-model">Model id:</label>
+                        <input type="text" id="cloud-custom-model" class="form-control" placeholder="provider/model-name"
+                            spellcheck="false" autocomplete="off">
+                        <small class="cloud-hint">Copy it from openrouter.ai/models. Models other than the two above were not tested for this task, and some do not accept an image as input.</small>
+                    </div>
+
+                    <details class="advanced-section">
+                        <summary class="advanced-toggle">
+                            <span><i class="bi bi-chat-square-text"></i> Advanced: additional instructions</span>
+                            <i class="bi bi-chevron-right toggle-icon"></i>
+                        </summary>
+                        <div class="advanced-content">
+                            <p class="info-text">Text added after the standard prompt, for example &ldquo;the drawing has a scale bar: keep it&rdquo;. The standard prompt cannot be changed. Custom text makes results harder to reproduce.</p>
+                            <textarea id="cloud-extra-prompt" class="form-control" rows="3" maxlength="1000"
+                                placeholder="Optional"></textarea>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- Section 3: Drawings -->
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <h3 class="form-section-title"><i class="bi bi-images"></i> Drawings &amp; output</h3>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            Upload Pottery Drawings:
+                            <span class="info-tooltip"
+                                data-tooltip="Pencil drawings to ink. Each output has the same size and format as its input."><i class="bi bi-info-circle"></i></span>
+                        </label>
+                        <div class="image-upload-area" id="cloud-upload-area">
+                            <input type="file" id="cloud-image-upload" multiple accept="image/*" class="file-input-hidden">
+                            <div class="upload-placeholder">
+                                <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+                                <p>Click to select images or drag &amp; drop here</p>
+                                <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                            </div>
+                            <div class="upload-preview" id="cloud-preview" style="display: none;"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cloud-output-dir">
+                            Output Directory:
+                            <span class="info-tooltip"
+                                data-tooltip="Folder where the inked drawings and the log are saved. Will be created if it does not exist."><i class="bi bi-info-circle"></i></span>
+                        </label>
+                        <div class="input-with-button">
+                            <input type="text" id="cloud-output-dir" value="./enhanced_pottery_cloud" class="form-control"
+                                placeholder="Enter output folder path">
+                            <button type="button" id="browse-cloud-dir" class="btn btn-secondary btn-small">
+                                <i class="bi bi-folder2-open"></i> Browse...
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: Cost and run -->
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <h3 class="form-section-title"><i class="bi bi-coin"></i> Cost &amp; run</h3>
+                    </div>
+
+                    <div class="cloud-estimate" aria-live="polite">
+                        <div class="cloud-estimate-main">
+                            <span class="cloud-estimate-value" id="cloud-estimate-value">&mdash;</span>
+                            <span class="cloud-estimate-label" id="cloud-estimate-label">Select drawings to see an estimate</span>
+                        </div>
+                        <p class="cloud-hint">Indicative price. The real cost of every image is read from OpenRouter and shown while it runs.</p>
+                    </div>
+
+                    <div class="form-grid-params cloud-budget-row">
+                        <div class="form-group">
+                            <label for="cloud-budget">
+                                Stop at (USD):
+                                <span class="info-tooltip"
+                                    data-tooltip="No new image is started once the cost reaches this amount. Leave empty for no limit."><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <input type="number" id="cloud-budget" min="0.01" step="0.01" placeholder="No limit" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-checkbox-card">
+                        <label>
+                            <input type="checkbox" id="cloud-align" checked>
+                            <span>Register the ink onto the pencil drawing (recommended)</span>
+                            <span class="info-tooltip"
+                                data-tooltip="Models often shift or rescale the vessel by a few pixels. This step moves the ink back onto the pencil lines so that the two overlay."><i class="bi bi-info-circle"></i></span>
+                        </label>
+                    </div>
+
+                    <button id="cloud-start-btn" class="btn btn-success btn-large" disabled style="width: 100%; margin-top: 12px;">
+                        <i class="bi bi-play-circle-fill"></i> Start Cloud Inking
+                    </button>
+                    <small class="cloud-hint cloud-start-hint" id="cloud-start-hint">Enter your key, accept the notice and add drawings to continue.</small>
+
+                    <div id="cloud-output" class="output-container" style="display: none;"></div>
+                    <div id="cloud-gallery" class="cloud-gallery" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Cloud processing modal -->
+    <div id="cloud-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="cloud-modal-title">
+        <div class="modal-content mac-window cloud-run">
+            <div class="mac-titlebar">
+                <span class="mac-window-title" id="cloud-modal-title">Cloud inking</span>
+                <button class="btn-close modal-close" id="cloud-modal-close" aria-label="Close" style="display: none;"></button>
+            </div>
+            <div class="cloud-run-body">
+                <div class="cloud-run-head">
+                    <p class="cloud-run-status" id="cloud-run-status" aria-live="polite">Starting...</p>
+                    <p class="cloud-run-current" id="cloud-run-current"></p>
+                </div>
+
+                <div class="progress-bar cloud-run-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="cloud-run-bar">
+                    <div class="progress-fill" id="cloud-run-fill"></div>
+                </div>
+
+                <dl class="cloud-stats">
+                    <div class="cloud-stat">
+                        <dt>Drawings</dt>
+                        <dd id="cloud-stat-done">0 / 0</dd>
+                    </div>
+                    <div class="cloud-stat">
+                        <dt>Cost</dt>
+                        <dd id="cloud-stat-cost">0.000 $</dd>
+                        <dd class="cloud-stat-sub" id="cloud-stat-est">estimate &mdash;</dd>
+                    </div>
+                    <div class="cloud-stat" id="cloud-stat-tokens-box" style="display: none;">
+                        <dt>Tokens</dt>
+                        <dd id="cloud-stat-tokens">0</dd>
+                        <dd class="cloud-stat-sub" id="cloud-stat-tokens-sub"></dd>
+                    </div>
+                    <div class="cloud-stat">
+                        <dt>Time</dt>
+                        <dd id="cloud-stat-time">0:00</dd>
+                        <dd class="cloud-stat-sub" id="cloud-stat-eta"></dd>
+                    </div>
+                </dl>
+
+                <div class="cloud-run-message" id="cloud-run-message" style="display: none;"></div>
+
+                <div class="cloud-run-actions">
+                    <button type="button" class="btn btn-secondary" id="cloud-cancel-btn">
+                        <i class="bi bi-stop-circle"></i> Stop after current images
+                    </button>
+                    <button type="button" class="btn btn-open-folder" id="cloud-open-folder-btn" style="display: none;">
+                        <i class="bi bi-folder2-open"></i> Open Output Folder
+                    </button>
+                    <button type="button" class="btn btn-primary" id="cloud-view-btn" style="display: none;">
+                        <i class="bi bi-eye"></i> View results
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Lightbox Modal for fullscreen images -->

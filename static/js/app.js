@@ -1166,6 +1166,8 @@ function initImageUpload(areaId, inputId, previewId) {
             document.getElementById('run-diagnostics-btn').disabled = !hasFiles;
         } else if (areaId === 'process-upload-area') {
             document.getElementById('process-images-btn').disabled = !hasFiles;
+        } else if (areaId === 'cloud-upload-area') {
+            document.dispatchEvent(new CustomEvent('cloud-files', { detail: selectedFiles.length }));
         }
     }
 }
@@ -1176,6 +1178,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initImageUpload('preprocess-upload-area', 'preprocess-image-upload', 'preprocess-preview');
     initImageUpload('diag-upload-area', 'diag-image-upload', 'diag-preview');
     initImageUpload('process-upload-area', 'process-image-upload', 'process-preview');
+    initImageUpload('cloud-upload-area', 'cloud-image-upload', 'cloud-preview');
 });
 
 // Copy Citation Helper Function
@@ -1444,3 +1447,411 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
     window.addEventListener('unload', sendShutdownBeacon);
 })();
 
+// ---------------------------------------------------------------------------
+// Cloud Inking (beta): generalist image models through OpenRouter.
+// The API key only lives in the input field and in the request body of the
+// batch start: it is never put in localStorage, cookies or the URL.
+// ---------------------------------------------------------------------------
+(function () {
+    const tab = document.getElementById('cloud-tab');
+    if (!tab) return;
+
+    const $ = id => document.getElementById(id);
+    const parseData = name => { try { return JSON.parse(tab.dataset[name] || '{}'); } catch (e) { return {}; } };
+    const EST_USD = parseData('estUsd');
+    const EST_SEC = parseData('estSec');
+    const MODEL_NOTES = parseData('modelNotes');
+    const MAX_VARIANTS = parseInt(tab.dataset.maxVariants || '4', 10);
+    const FALLBACK_USD = 0.05;
+
+    const keyInput = $('cloud-api-key');
+    const consent = $('cloud-consent');
+    const modelSel = $('cloud-model-select');
+    const customGroup = $('cloud-custom-model-group');
+    const customInput = $('cloud-custom-model');
+    const variantsInput = $('cloud-variants');
+    const startBtn = $('cloud-start-btn');
+    const startHint = $('cloud-start-hint');
+    const outputBox = $('cloud-output');
+    const gallery = $('cloud-gallery');
+
+    const modal = $('cloud-modal');
+    const closeBtn = $('cloud-modal-close');
+    const cancelBtn = $('cloud-cancel-btn');
+    const openBtn = $('cloud-open-folder-btn');
+    const viewBtn = $('cloud-view-btn');
+
+    let fileCount = 0;
+    let running = false;
+    let lastOutputDir = null;
+
+    const fmtUsd = v => `${(v || 0).toFixed(3)} $`;
+    const fmtClock = sec => {
+        sec = Math.max(0, Math.round(sec));
+        return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+    };
+    const fmtInt = n => (n || 0).toLocaleString('en-US');
+
+    function selectedStyle() {
+        const el = document.querySelector('input[name="cloud-style"]:checked');
+        return el ? el.value : 'fine';
+    }
+
+    function selectedModel() {
+        return modelSel.value === 'custom' ? customInput.value.trim() : modelSel.value;
+    }
+
+    function variants() {
+        const v = parseInt(variantsInput.value, 10);
+        return Number.isFinite(v) ? Math.min(Math.max(v, 1), MAX_VARIANTS) : 1;
+    }
+
+    function modelIdValid() {
+        return modelSel.value !== 'custom' || /^[\w.\-]+\/[\w.\-:]+$/.test(customInput.value.trim());
+    }
+
+    // ---- estimate and start gate -------------------------------------------------
+    function refreshEstimate() {
+        const valueEl = $('cloud-estimate-value');
+        const labelEl = $('cloud-estimate-label');
+        if (fileCount === 0) {
+            valueEl.textContent = '—';
+            labelEl.textContent = 'Select drawings to see an estimate';
+            return;
+        }
+        const each = EST_USD[selectedModel()] ?? FALLBACK_USD;
+        const known = EST_USD[selectedModel()] !== undefined;
+        const v = variants();
+        const total = each * fileCount * v;
+        valueEl.textContent = `≈ ${total.toFixed(2)} $`;
+        labelEl.textContent = `${fileCount} drawing${fileCount > 1 ? 's' : ''} × ${v} version${v > 1 ? 's' : ''} × ~${each.toFixed(2)} $` +
+            (known ? '' : ' (price of this model unknown)');
+    }
+
+    function refreshGate() {
+        const missing = [];
+        if (!keyInput.value.trim()) missing.push('your API key');
+        if (!consent.checked) missing.push('the privacy notice');
+        if (!modelIdValid()) missing.push('a valid model id');
+        if (fileCount === 0) missing.push('at least one drawing');
+        startBtn.disabled = running || missing.length > 0;
+        startHint.textContent = missing.length
+            ? `To continue: ${missing.join(', ')}.`
+            : 'Each image is sent to the provider as soon as you press Start.';
+    }
+
+    function refreshAll() {
+        refreshEstimate();
+        refreshGate();
+    }
+
+    document.addEventListener('cloud-files', e => {
+        fileCount = e.detail || 0;
+        refreshAll();
+    });
+    [keyInput, consent, customInput].forEach(el => el.addEventListener('input', refreshGate));
+    consent.addEventListener('change', refreshGate);
+    variantsInput.addEventListener('input', refreshEstimate);
+    variantsInput.addEventListener('change', () => { variantsInput.value = variants(); refreshEstimate(); });
+    document.querySelectorAll('input[name="cloud-style"]').forEach(el => el.addEventListener('change', refreshEstimate));
+
+    modelSel.addEventListener('change', () => {
+        const custom = modelSel.value === 'custom';
+        customGroup.style.display = custom ? 'block' : 'none';
+        $('cloud-model-note').textContent = custom ? 'Not tested for this task.' : (MODEL_NOTES[modelSel.value] || '');
+        refreshAll();
+    });
+    customInput.addEventListener('input', refreshEstimate);
+
+    $('browse-cloud-dir').addEventListener('click', async function () {
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading"></span> Opening...';
+        try {
+            const response = await fetch('/api/select-directory', { method: 'POST' });
+            const data = await response.json();
+            if (data.success && data.directory) $('cloud-output-dir').value = data.directory;
+        } catch (error) {
+            alert('Error opening directory picker: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-folder2-open"></i> Browse...';
+        }
+    });
+
+    // ---- run modal -------------------------------------------------------------
+    let timer = null;
+    let startedAt = 0;
+    let lastSnap = null;
+    let lastSnapAt = 0;
+    let sessionId = null;
+    let source = null;
+    let finished = false;
+
+    function openModal() {
+        finished = false;
+        $('cloud-run-status').textContent = 'Starting...';
+        $('cloud-run-current').textContent = '';
+        setProgress($('cloud-run-fill'), 0);
+        $('cloud-run-bar').setAttribute('aria-valuenow', '0');
+        $('cloud-stat-done').textContent = '0 / 0';
+        $('cloud-stat-cost').textContent = fmtUsd(0);
+        $('cloud-stat-est').textContent = 'estimate —';
+        $('cloud-stat-tokens-box').style.display = 'none';
+        $('cloud-stat-time').textContent = '0:00';
+        $('cloud-stat-eta').textContent = '';
+        const msg = $('cloud-run-message');
+        msg.style.display = 'none';
+        msg.className = 'cloud-run-message';
+        cancelBtn.style.display = '';
+        cancelBtn.disabled = false;
+        openBtn.style.display = 'none';
+        viewBtn.style.display = 'none';
+        closeBtn.style.display = 'none';
+        modal.style.display = 'flex';
+        startedAt = Date.now();
+        lastSnap = null;
+        clearInterval(timer);
+        timer = setInterval(tick, 1000);
+        tick();
+    }
+
+    function closeModal() {
+        if (!finished) return;
+        modal.style.display = 'none';
+    }
+
+    function tick() {
+        const now = Date.now();
+        $('cloud-stat-time').textContent = fmtClock((now - startedAt) / 1000);
+        if (!finished && lastSnap && lastSnap.eta != null && lastSnap.done < lastSnap.total) {
+            const left = lastSnap.eta - (now - lastSnapAt) / 1000;
+            $('cloud-stat-eta').textContent = left > 1 ? `about ${fmtClock(left)} left` : 'almost done';
+        }
+    }
+
+    function applySnapshot(s) {
+        lastSnap = s;
+        lastSnapAt = Date.now();
+        const pct = s.total ? (s.done / s.total) * 100 : 0;
+        setProgress($('cloud-run-fill'), pct);
+        $('cloud-run-bar').setAttribute('aria-valuenow', String(Math.round(pct)));
+        $('cloud-stat-done').textContent = `${s.done} / ${s.total}` + (s.failed ? ` (${s.failed} failed)` : '');
+        $('cloud-stat-cost').textContent = fmtUsd(s.cost_usd);
+        $('cloud-stat-est').textContent = `estimate ${fmtUsd(s.estimated_usd)}`;
+        if (s.has_tokens) {
+            $('cloud-stat-tokens-box').style.display = '';
+            $('cloud-stat-tokens').textContent = fmtInt(s.tokens_in + s.tokens_out);
+            $('cloud-stat-tokens-sub').textContent = `${fmtInt(s.tokens_in)} in · ${fmtInt(s.tokens_out)} out`;
+        }
+        if (!finished && !cancelBtn.disabled) {
+            $('cloud-run-status').textContent = 'Inking your drawings...';
+        }
+        $('cloud-run-current').textContent = s.current || '';
+        tick();
+    }
+
+    function showRunMessage(kind, text) {
+        const msg = $('cloud-run-message');
+        msg.className = `cloud-run-message is-${kind}`;
+        msg.textContent = text;
+        msg.style.display = 'block';
+    }
+
+    const STOP_TEXT = {
+        cancelled: ['Stopped', 'warning', 'You stopped the run. Images already finished are saved.'],
+        budget: ['Stopped at your limit', 'warning', 'The cost limit was reached, so no new images were started. Finished images are saved.'],
+        credits: ['Out of credits', 'error', 'Your OpenRouter account has no credits left. Add credits at openrouter.ai and run the remaining drawings again.'],
+        auth: ['API key rejected', 'error', 'OpenRouter did not accept the key. Check that it is correct and active, then try again.'],
+        ssl: ['Connection blocked', 'error', 'The secure connection to OpenRouter was blocked, usually by an antivirus that scans HTTPS. Install the optional package truststore (pip install truststore) in the PyPottery environment, restart the app and try again.']
+    };
+
+    function finishRun(results, fatalMessage) {
+        finished = true;
+        running = false;
+        clearInterval(timer);
+        if (source) { source.close(); source = null; }
+        cancelBtn.style.display = 'none';
+        closeBtn.style.display = '';
+        refreshGate();
+
+        if (!results) {
+            $('cloud-run-status').textContent = 'Something went wrong';
+            showRunMessage('error', fatalMessage || 'The run stopped unexpectedly.');
+            return;
+        }
+
+        lastOutputDir = results.output_dir;
+        const stop = results.stopped && STOP_TEXT[results.stopped];
+        if (stop) {
+            $('cloud-run-status').textContent = stop[0];
+            showRunMessage(stop[1], stop[2]);
+        } else if (results.failed > 0) {
+            $('cloud-run-status').textContent = `Done, ${results.failed} failed`;
+            const first = results.errors && results.errors[0];
+            showRunMessage('warning', first ? `${first.file}: ${first.message}` : 'Some images failed. See the log file.');
+        } else {
+            $('cloud-run-status').textContent = 'Done';
+            showRunMessage('success', `${results.successful} image${results.successful === 1 ? '' : 's'} saved. Total cost ${fmtUsd(results.cost_usd)}.`);
+        }
+        $('cloud-run-current').textContent = '';
+        $('cloud-stat-cost').textContent = fmtUsd(results.cost_usd);
+        $('cloud-stat-done').textContent = `${results.successful} / ${results.total}` + (results.failed ? ` (${results.failed} failed)` : '');
+        $('cloud-stat-eta').textContent = '';
+        openBtn.style.display = '';
+        if (results.successful > 0) viewBtn.style.display = '';
+        renderResults(results);
+    }
+
+    // ---- results ---------------------------------------------------------------
+    function renderResults(results) {
+        const box = outputBox;
+        box.replaceChildren();
+        const p = (html) => { const el = document.createElement('p'); el.innerHTML = html; box.appendChild(el); };
+        const msg = document.createElement('div');
+        msg.className = 'message message-success';
+        msg.innerHTML = '<i class="bi bi-check-circle-fill"></i> <span></span>';
+        msg.querySelector('span').textContent = `${results.successful} of ${results.total} images saved.`;
+        box.appendChild(msg);
+        p(`<strong><i class="bi bi-coin"></i> Cost:</strong> ${fmtUsd(results.cost_usd)}` +
+          (results.has_tokens ? ` &middot; ${fmtInt(results.tokens_in)} input and ${fmtInt(results.tokens_out)} output tokens` : ''));
+        p(`<strong><i class="bi bi-stopwatch"></i> Average time:</strong> ${results.average_time.toFixed(1)} s per image`);
+        const dir = document.createElement('p');
+        dir.innerHTML = '<strong><i class="bi bi-folder2-open"></i> Output directory:</strong> <code></code>';
+        dir.querySelector('code').textContent = results.output_dir;
+        box.appendChild(dir);
+        if (results.log_file) {
+            const log = document.createElement('p');
+            log.innerHTML = '<strong><i class="bi bi-file-earmark-text"></i> Log file:</strong> <code></code>';
+            log.querySelector('code').textContent = results.log_file;
+            box.appendChild(log);
+        }
+        const folderBtn = document.createElement('button');
+        folderBtn.type = 'button';
+        folderBtn.className = 'btn btn-open-folder';
+        folderBtn.innerHTML = '<i class="bi bi-folder2-open"></i> Open Output Folder';
+        folderBtn.addEventListener('click', () => openFolder(lastOutputDir));
+        box.appendChild(folderBtn);
+        box.style.display = 'block';
+
+        // gallery: the pencil drawing next to each of its inked versions
+        const items = results.items || [];
+        gallery.replaceChildren();
+        if (!items.length) { gallery.style.display = 'none'; return; }
+        const stamp = Date.now();
+        const title = document.createElement('h3');
+        title.textContent = 'Results';
+        gallery.appendChild(title);
+        const list = document.createElement('div');
+        list.className = 'cloud-gallery-list';
+        const bySource = new Map();
+        items.forEach(it => { if (!bySource.has(it.source)) bySource.set(it.source, []); bySource.get(it.source).push(it); });
+        bySource.forEach((versions, source) => {
+            const wrap = document.createElement('div');
+            const name = document.createElement('p');
+            name.className = 'cloud-item-name';
+            name.textContent = source;
+            const row = document.createElement('div');
+            row.className = 'cloud-item-row';
+            row.appendChild(figure(`/api/get-image/input/${encodeURIComponent(source)}?t=${stamp}`, 'Pencil', source));
+            versions.forEach(v => {
+                const cap = (versions.length > 1 ? `Version ${v.variant}` : 'Ink') +
+                    (v.seconds ? ` · ${v.seconds} s` : '') + (v.cost_usd !== '' && v.cost_usd != null ? ` · ${Number(v.cost_usd).toFixed(3)} $` : '');
+                row.appendChild(figure(`/api/get-image/output/${encodeURIComponent(v.file)}?t=${stamp}`, cap, v.file));
+            });
+            wrap.append(name, row);
+            list.appendChild(wrap);
+        });
+        gallery.appendChild(list);
+        gallery.style.display = 'block';
+    }
+
+    function figure(src, caption, alt) {
+        const fig = document.createElement('figure');
+        fig.className = 'cloud-fig';
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.src = src;
+        img.alt = alt;
+        img.addEventListener('click', () => openLightbox(img.src));
+        const cap = document.createElement('figcaption');
+        cap.textContent = caption;
+        fig.append(img, cap);
+        return fig;
+    }
+
+    // ---- start / cancel ------------------------------------------------------
+    startBtn.addEventListener('click', async function () {
+        if (running) return;
+        const files = $('cloud-image-upload').files;
+        running = true;
+        refreshGate();
+        outputBox.style.display = 'none';
+        gallery.style.display = 'none';
+        openModal();
+        $('cloud-run-status').textContent = 'Uploading drawings...';
+
+        try {
+            const formData = new FormData();
+            Array.from(files).forEach(file => formData.append('files', file));
+            const up = await fetch('/api/upload-images', { method: 'POST', body: formData });
+            if (!up.ok) throw new Error('Upload failed');
+
+            const response = await fetch('/api/cloud/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    api_key: keyInput.value.trim(),
+                    consent: consent.checked,
+                    model: modelSel.value,
+                    custom_model: customInput.value.trim(),
+                    style: selectedStyle(),
+                    variants: variants(),
+                    extra_prompt: $('cloud-extra-prompt').value,
+                    align: $('cloud-align').checked,
+                    budget_usd: $('cloud-budget').value,
+                    output_dir: $('cloud-output-dir').value
+                })
+            });
+            const data = await response.json();
+            if (!data.success) throw new Error(data.error || 'Could not start');
+
+            sessionId = data.session_id;
+            $('cloud-stat-est').textContent = `estimate ${fmtUsd(data.estimated_usd)}`;
+            $('cloud-run-status').textContent = 'Inking your drawings...';
+            source = new EventSource(`/api/progress/${sessionId}`);
+            source.onmessage = function (event) {
+                const msg = JSON.parse(event.data);
+                if (msg.keepalive) return;
+                if (msg.error) { finishRun(null, msg.message || msg.error); return; }
+                if (msg.cloud) applySnapshot(msg.cloud);
+                if (msg.completed && msg.results) finishRun(msg.results);
+            };
+            source.onerror = function () {
+                if (finished) return;
+                finishRun(null, 'The connection to the app was lost. Images already finished are saved in the output folder.');
+            };
+        } catch (error) {
+            finishRun(null, error.message);
+        }
+    });
+
+    cancelBtn.addEventListener('click', async function () {
+        if (!sessionId || finished) return;
+        cancelBtn.disabled = true;
+        $('cloud-run-status').textContent = 'Stopping...';
+        $('cloud-run-current').textContent = 'Waiting for the images already in progress';
+        try { await fetch(`/api/cloud/cancel/${sessionId}`, { method: 'POST' }); } catch (e) { /* the run ends on its own */ }
+    });
+
+    openBtn.addEventListener('click', () => { if (lastOutputDir) openFolder(lastOutputDir); });
+    viewBtn.addEventListener('click', () => {
+        closeModal();
+        gallery.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    closeBtn.addEventListener('click', closeModal);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.style.display === 'flex') closeModal(); });
+
+    refreshAll();
+})();

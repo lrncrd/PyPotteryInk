@@ -196,5 +196,15 @@ docs
 
 release/
 enhanced_pottery/
+enhanced_pottery_cloud/
 graphify-out/
 static/vendor/
+# Article material (A&C paper): benchmark, drafts, references, rater data, unpublished drawings.
+# Kept locally only; the cloud mode shipped in the app lives in cloud.py.
+benchmark/
+paper_ac/
+paper_ac.zip
+references_md/
+references/
+INPUT/
+experiments/
