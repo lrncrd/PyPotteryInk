@@ -37,6 +37,7 @@ As part of the **PyPottery** toolkit, **PyPotteryInk** is a deep learning applic
 - **Multi-GPU Support**: CUDA (NVIDIA), MPS (Apple Silicon) and CPU fallback
 - **Web Interface**: Local Flask interface with hardware check, model management, diagnostics and preprocessing statistics
 - **Custom Models**: Upload and use your own fine-tuned models
+- **Cloud Inking (beta)**: Optional second workflow that inks drawings with a general-purpose image model through OpenRouter, with no GPU needed (see below)
 
 <div align="center">
 <img src="imgs/gui_example.png" width="800"/>
@@ -96,6 +97,15 @@ Benchmarks per GPU are in the [Model Zoo](https://lrncrd.github.io/PyPottery/pyp
 5. **Batch process** a folder of drawings and follow the real-time progress
 
 For the full walkthrough, see the **[Usage Guide](https://lrncrd.github.io/PyPottery/pypotteryink/usage.html)**. Something not working? See the [Getting Started guide](https://lrncrd.github.io/PyPottery/pypotteryink/index.html#troubleshooting) and the tips in [Advanced](https://lrncrd.github.io/PyPottery/pypotteryink/advanced.html).
+
+## ☁️ Cloud Inking (beta)
+
+The *Cloud Inking* tab is a second, optional workflow next to the local one. Instead of the fine-tuned pix2pix-turbo models it sends each drawing to a general-purpose image-editing model (GPT Image 2, or any other OpenRouter model id) and returns an ink drawing of the same size, optionally registered onto the pencil lines.
+
+- **No GPU, no model download**: you only need an [OpenRouter](https://openrouter.ai/keys) API key and credits. A drawing costs roughly 0.05 $ with GPT Image 2; the real cost of every image is shown while it runs and saved in the log.
+- **Stippling style**: *Fine* (small dots) or *Coarse* (larger, bolder dots), plus 1-4 versions per drawing and a stop-at-budget limit.
+- **Your drawings leave the computer**: each image is sent to OpenRouter and to the company that runs the model. The API key stays in memory for the session and is never saved. The local workflow in the other tabs stays fully offline, and remains the right choice for unpublished material you cannot share.
+- Only GPT Image 2 is offered by default because it gave the best results in our benchmark; models you add by id were not tested and were mostly worse.
 
 ## 🤖 Available Models
 

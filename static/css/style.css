@@ -2465,3 +2465,374 @@ body {
     color: #000000;
     transform: translateY(-1px);
 }
+
+/* --------------------------------------------------------------------------
+   18. Cloud Inking (beta): privacy gate, style choice, cost estimate, run modal
+   -------------------------------------------------------------------------- */
+.beta-chip {
+    display: inline-block;
+    padding: 1px 8px;
+    margin-left: 6px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--primary-border);
+    background: var(--primary-soft);
+    color: var(--primary-dark);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.tab-button.active .beta-chip {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.45);
+    color: #ffffff;
+}
+
+.cloud-hint {
+    display: block;
+    margin-top: 6px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.cloud-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: var(--text-main);
+}
+
+/* Privacy notice: full-surface tint, not an edge stripe */
+.cloud-privacy {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: var(--radius-sm);
+    color: #78350f;
+}
+
+.cloud-privacy i {
+    flex: none;
+    margin-top: 2px;
+    font-size: 1.05rem;
+    color: var(--warning-color);
+}
+
+.cloud-privacy p {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+/* Style choice: two radio options side by side */
+.cloud-style-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.cloud-style-card {
+    position: relative;
+    display: flex;
+    text-align: left;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px 12px 40px;
+    min-height: 64px;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* beats `.form-group label` (flex, centred, bottom margin) */
+.form-group .cloud-style-card {
+    align-items: flex-start;
+    margin-bottom: 0;
+}
+
+.cloud-style-card:hover {
+    border-color: var(--primary-border);
+    background: var(--bg-page);
+}
+
+.cloud-style-card input {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--primary);
+    cursor: pointer;
+}
+
+.cloud-style-card:has(input:checked) {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+    box-shadow: 0 0 0 1px var(--primary);
+}
+
+.cloud-style-card:has(input:focus-visible) {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.cloud-style-name {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-main);
+}
+
+.cloud-style-desc {
+    font-size: 0.84rem;
+    line-height: 1.45;
+    color: var(--text-dim);
+}
+
+.cloud-model-row {
+    margin-top: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.cloud-budget-row {
+    grid-template-columns: minmax(140px, 260px);
+}
+
+/* Cost estimate sits right above the action it informs */
+.cloud-estimate {
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.cloud-estimate-main {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+}
+
+.cloud-estimate-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.cloud-estimate-label {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+}
+
+.cloud-start-hint {
+    margin-top: 8px;
+    text-align: center;
+}
+
+/* Results gallery: pencil next to its inked versions */
+.cloud-gallery {
+    margin-top: 20px;
+}
+
+.cloud-gallery h3 {
+    margin-bottom: 12px;
+}
+
+.cloud-gallery-list {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.cloud-item-name {
+    margin: 0 0 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    word-break: break-all;
+}
+
+.cloud-item-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.cloud-fig {
+    margin: 0;
+}
+
+.cloud-fig img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+    cursor: zoom-in;
+    transition: box-shadow 0.2s ease;
+}
+
+.cloud-fig img:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.cloud-fig figcaption {
+    margin-top: 6px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* Processing modal */
+#cloud-modal.modal {
+    z-index: 10000;
+}
+
+.cloud-run.mac-window {
+    max-width: 540px;
+}
+
+.cloud-run-body {
+    padding: 4px 26px 24px;
+}
+
+.cloud-run-head {
+    margin-bottom: 14px;
+}
+
+.cloud-run-status {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.cloud-run-current {
+    margin: 4px 0 0;
+    min-height: 1.3em;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cloud-run-bar {
+    margin-bottom: 18px;
+}
+
+.cloud-stats {
+    margin: 0 0 16px;
+    padding: 0;
+    border-top: 1px solid var(--border);
+}
+
+.cloud-stat {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 16px;
+    align-items: baseline;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.cloud-stat dt {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-dim);
+}
+
+.cloud-stat dd {
+    margin: 0;
+    text-align: right;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.cloud-stat .cloud-stat-sub {
+    grid-column: 1 / -1;
+    margin-top: 2px;
+    text-align: right;
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.cloud-run-message {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.cloud-run-message.is-error {
+    background: #fff1f2;
+    border: 1px solid #fecdd3;
+    color: #9f1239;
+}
+
+.cloud-run-message.is-warning {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+}
+
+.cloud-run-message.is-success {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    color: #166534;
+}
+
+.cloud-run-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.cloud-run-actions .btn {
+    margin: 0;
+}
+
+@media (max-width: 640px) {
+    .cloud-run-body {
+        padding: 4px 18px 20px;
+    }
+
+    .cloud-run-actions {
+        flex-direction: column-reverse;
+    }
+
+    .cloud-run-actions .btn {
+        width: 100%;
+    }
+
+    .cloud-style-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cloud-style-card,
+    .cloud-fig img {
+        transition: none;
+    }
+}
