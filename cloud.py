@@ -99,6 +99,52 @@ BASE_PROMPT = (
     + _COMMON
 )
 
+# Base prompts with a style reference (conditions R1 and R2 of the benchmark). The reference is a
+# SHAPE-free style guide: the model must take only the drawing style from it.
+_SECTIONS_RULE = (
+    "Sections (the cut profile of walls, rims and handles) are a single thin band between two lines, "
+    "exactly as in image 1: keep them completely white inside, with no stippling, no shading, no hatching "
+    "and no extra parallel lines. "
+    "Preserve EXACTLY the profile, section, proportions and the position of every line of image 1; "
+    "do not add, remove or move any element. "
+)
+REFERENCE_PROMPTS = {
+    # one image: a sheet with a pencil drawing on the left and its inked version on the right
+    "sheet": (
+        "Image 1 is the drawing to convert. Image 2 is ONLY a style reference sheet: on its left is a "
+        "pencil drawing of archaeological pottery and on its right the same drawing converted into a "
+        "publication-ready black-and-white ink drawing. "
+        "Redraw image 1 as an ink drawing with the same line weights, stippling technique and "
+        "conventions as the inked drawing in image 2. "
+        "Take ONLY the drawing style from image 2: never copy its shapes, decorations, incisions, "
+        "patterns, lines or marks. Every line and every decoration in the output must come from image 1. "
+        + _SECTIONS_RULE + _COMMON
+    ),
+    # two images: a pencil drawing and the same drawing inked
+    "pair": (
+        "Image 1 is the drawing to convert. Images 2 and 3 are ONLY a style reference: image 2 is a pencil "
+        "drawing of archaeological pottery and image 3 is the same drawing converted into a "
+        "publication-ready black-and-white ink drawing. "
+        "Redraw image 1 as an ink drawing with the same line weights, stippling technique and conventions "
+        "as image 3. "
+        "Take ONLY the drawing style from images 2 and 3: never copy their shapes, decorations, incisions, "
+        "patterns, lines or marks. Every line and every decoration in the output must come from image 1. "
+        + _SECTIONS_RULE + _COMMON
+    ),
+    # one image: only an inked drawing, the style to copy (no pencil version of it)
+    "style": (
+        "Image 1 is the drawing to convert. Image 2 is ONLY a style reference: a finished "
+        "publication-ready black-and-white ink drawing of archaeological pottery. "
+        "Redraw image 1 as an ink drawing with the same line weights, stippling technique and "
+        "conventions as image 2. "
+        "Take ONLY the drawing style from image 2: never copy its shapes, decorations, incisions, "
+        "patterns, lines or marks. Every line and every decoration in the output must come from image 1. "
+        + _SECTIONS_RULE + _COMMON
+    ),
+}
+REFERENCE_MODES = ("none", "pair", "sheet", "style")
+REFERENCE_LONG_SIDE = {"sheet": 1536, "pair": 1024, "style": 1024}   # sheet and pair as in the benchmark
+
 _STYLE_HEAD = (
     "Draw it as a professional archaeological ink drawing (a 'lucido'), made with a technical pen in black ink: "
     "continuous, confident outlines, thicker for the outer contour and thinner for interior and fracture lines. "
@@ -134,15 +180,31 @@ STYLES = {
 }
 
 
-def build_prompt(style, extra=""):
-    """Frozen base prompt + style fragment (+ the user's optional additional instructions)."""
+def build_prompt(style, extra="", reference="none"):
+    """Frozen base prompt (with or without a style reference) + style fragment (+ the user's optional
+    additional instructions)."""
     if style not in STYLES:
         raise ValueError(f"Unknown style '{style}'")
-    prompt = BASE_PROMPT + " " + STYLES[style]["fragment"]
+    if reference not in REFERENCE_MODES:
+        raise ValueError(f"Unknown reference mode '{reference}'")
+    base = BASE_PROMPT if reference == "none" else REFERENCE_PROMPTS[reference]
+    prompt = base + " " + STYLES[style]["fragment"]
     extra = (extra or "").strip()
     if extra:
         prompt += " Additional instructions: " + extra
     return prompt
+
+
+def prepare_references(mode, images):
+    """Reference images ready to send. `sheet`: one image (pencil left, ink right); `pair`: the pencil
+    drawing then its inked version; `style`: one inked drawing. Returns [] for mode `none`. Raises
+    ValueError on a wrong count."""
+    if mode == "none":
+        return []
+    need = {"sheet": 1, "pair": 2, "style": 1}[mode]
+    if len(images) != need:
+        raise ValueError(f"The '{mode}' reference needs {need} image{'s' if need > 1 else ''}.")
+    return [fit_long_side(im.convert("L"), REFERENCE_LONG_SIDE[mode]) for im in images]
 
 
 def prompt_hash(prompt):
@@ -279,15 +341,16 @@ def _tokens(usage):
     return first("input_tokens", "prompt_tokens"), first("output_tokens", "completion_tokens")
 
 
-def call_model(api_key, model, prompt, image, aspect, quality="medium"):
-    """One image-edit request. Returns (PIL image, cost USD or None, usage dict, provenance dict).
+def call_model(api_key, model, prompt, images, aspect, quality="medium"):
+    """One image-edit request. `images`: the drawing first, then the optional reference image(s).
+    Returns (PIL image, cost USD or None, usage dict, provenance dict).
 
     Raises CloudError: 401/403 -> auth, 402 -> credits (fatal for the batch), other 4xx -> bad_request;
     429/5xx and network errors are retried three times first."""
     payload = {
         "model": model,
         "prompt": prompt,
-        "input_references": [{"type": "image_url", "image_url": {"url": to_data_url(image)}}],
+        "input_references": [{"type": "image_url", "image_url": {"url": to_data_url(i)}} for i in images],
         "resolution": "2K",
         "aspect_ratio": aspect,
         "output_format": "png",
@@ -334,13 +397,14 @@ def call_model(api_key, model, prompt, image, aspect, quality="medium"):
     raise CloudError(last_err[0], last_err[1]) if last_err else CloudError("other", "Failed after retries.")
 
 
-def ink_image(api_key, model, prompt, src, do_align=True):
-    """Ink one pencil drawing (PIL, mode L). Returns (output image of the same size as `src`, info dict)."""
+def ink_image(api_key, model, prompt, src, do_align=True, references=()):
+    """Ink one pencil drawing (PIL, mode L), optionally with prepared style reference images
+    (see prepare_references). Returns (output image of the same size as `src`, info dict)."""
     t0 = time.time()
     allowed = MODEL_ASPECTS.get(model)
     padded, aspect, rel_box = pad_to_aspect(src, allowed)
     sent = fit_long_side(padded, INPUT_LONG_SIDE)
-    out, cost, usage, prov = call_model(api_key, model, prompt, sent, aspect)
+    out, cost, usage, prov = call_model(api_key, model, prompt, [sent, *references], aspect)
     # the model must hand back the ratio it was sent; otherwise the crop would be misplaced
     if abs((out.width / out.height) / (sent.width / sent.height) - 1) > 0.03:
         raise CloudError("aspect", f"The model returned an unexpected shape ({out.width}x{out.height}).")
@@ -368,7 +432,8 @@ def _save(img, path):
 
 
 def run_batch(api_key, input_folder, output_dir, model, style, variants=1, extra="", do_align=True,
-              budget_usd=None, progress=None, cancel=None, workers=DEFAULT_WORKERS):
+              budget_usd=None, progress=None, cancel=None, workers=DEFAULT_WORKERS,
+              reference="none", reference_images=()):
     """Ink every image of `input_folder`. Each drawing is sent `variants` times.
 
     `progress(dict)` is called after every event with: done, total, current, cost_usd, estimated_usd,
@@ -381,7 +446,8 @@ def run_batch(api_key, input_folder, output_dir, model, style, variants=1, extra
     files = sorted(p for p in in_dir.iterdir() if p.suffix.lower() in IMAGE_EXTS)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "logs").mkdir(exist_ok=True)
-    prompt = build_prompt(style, extra)
+    prompt = build_prompt(style, extra, reference)
+    refs = prepare_references(reference, list(reference_images))
     p_hash = prompt_hash(prompt)
     est_each = (MODELS.get(model) or CUSTOM_MODEL)["est_usd"]
     jobs = [(f, v) for f in files for v in range(1, variants + 1)]
@@ -435,11 +501,11 @@ def run_batch(api_key, input_folder, output_dir, model, style, variants=1, extra
             name = f.name if variants == 1 else f"{f.stem}_v{v}{f.suffix}"
             emit(current=name)
             row = {"file": name, "source": f.name, "variant": v, "model": model, "style": style,
-                   "prompt_hash": p_hash, "custom_prompt": bool(extra.strip()), "aligned": "",
+                   "prompt_hash": p_hash, "custom_prompt": bool(extra.strip()), "reference": reference, "aligned": "",
                    "seconds": "", "cost_usd": "", "tokens_in": "", "tokens_out": "", "provider": "", "error": ""}
             try:
                 src = ImageOps.exif_transpose(Image.open(f)).convert("L")
-                out, info = ink_image(api_key, model, prompt, src, do_align)
+                out, info = ink_image(api_key, model, prompt, src, do_align, refs)
                 _save(out, out_dir / name)
                 row.update(aligned=info["aligned"], seconds=round(info["seconds"], 1),
                            cost_usd=info["cost"] if info["cost"] is not None else "",
@@ -480,7 +546,7 @@ def run_batch(api_key, input_folder, output_dir, model, style, variants=1, extra
             ex.submit(worker)
 
     log_path = out_dir / "logs" / f"cloud_log_{datetime.now():%Y%m%d_%H%M%S}.csv"
-    cols = ["file", "source", "variant", "model", "style", "prompt_hash", "custom_prompt", "aligned",
+    cols = ["file", "source", "variant", "model", "style", "prompt_hash", "custom_prompt", "reference", "aligned",
             "seconds", "cost_usd", "tokens_in", "tokens_out", "provider", "error"]
     with open(log_path, "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=cols)

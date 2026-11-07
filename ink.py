@@ -49,6 +49,7 @@ warnings.filterwarnings("ignore")
 # don't repeatedly reload the same model (saves time and VRAM).
 _GLOBAL_MODEL = None
 _GLOBAL_MODEL_PATH = None
+_GLOBAL_MODEL_HALF = False  # precision of the cached model: a run asking for the other one reloads it
 
 
 def cleanup():
@@ -72,7 +73,7 @@ def cleanup():
 def _load_model_cached(model_path: str, to_device: torch.device, use_fp16: bool) -> Pix2Pix_Turbo:
     """Load Pix2Pix_Turbo model and cache it globally.
 
-    - If the requested model_path differs from the cached one, we reload.
+    - If the requested model_path or precision differs from the cached one, we reload.
     - We only apply .half() when running on CUDA and when use_fp16 is True.
 
     Args:
@@ -83,11 +84,16 @@ def _load_model_cached(model_path: str, to_device: torch.device, use_fp16: bool)
     Returns:
         Instantiated and prepared model (set to eval)
     """
-    global _GLOBAL_MODEL, _GLOBAL_MODEL_PATH
+    global _GLOBAL_MODEL, _GLOBAL_MODEL_PATH, _GLOBAL_MODEL_HALF
 
-    # If we already have the exact model loaded, just return it
-    if _GLOBAL_MODEL is not None and _GLOBAL_MODEL_PATH == os.path.abspath(model_path):
+    # If we already have the exact model loaded in the same precision, just return it
+    want_half = bool(use_fp16 and to_device.type == "cuda")
+    if (_GLOBAL_MODEL is not None and _GLOBAL_MODEL_PATH == os.path.abspath(model_path)
+            and _GLOBAL_MODEL_HALF == want_half):
         return _GLOBAL_MODEL
+    if _GLOBAL_MODEL is not None:  # free the old one before loading the next
+        _GLOBAL_MODEL = None
+        cleanup()
 
     # Otherwise load a fresh model instance
     print(f"🔄 Loading model from: {model_path}")
@@ -117,6 +123,7 @@ def _load_model_cached(model_path: str, to_device: torch.device, use_fp16: bool)
 
     _GLOBAL_MODEL = model
     _GLOBAL_MODEL_PATH = os.path.abspath(model_path)
+    _GLOBAL_MODEL_HALF = want_half and next(model.parameters()).dtype == torch.float16
     return _GLOBAL_MODEL
 
 
@@ -492,11 +499,14 @@ def process_folder(
     progress_callback=None,
     export_elements: bool = True,
     export_svg: bool = True,
+    stop_event=None,
 ):
     """Process a folder of images using improved patch strategy.
 
     Public API kept identical. The function now reuses a cached model instance
-    and centralises logging and cleanup behaviour.
+    and centralises logging and cleanup behaviour. `stop_event` (a threading.Event)
+    ends the batch after the image being inked; the ones not started are listed in
+    the result under 'not_started'.
     """
     print_disclosure_reminder()
     print(f"\n🚀 Initialising batch processing with pix2pix_turbo...")
@@ -525,7 +535,9 @@ def process_folder(
     successful_conversions = 0
     failed_conversions = 0
     failed_files: List[str] = []
+    errors: Dict[str, str] = {}
     processing_times: List[float] = []
+    not_started: List[str] = []
 
     log_file = os.path.join(log_dir, f'processing_log_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.txt')
 
@@ -543,6 +555,11 @@ def process_folder(
         log.write(f"- Prompt: {prompt}\n\n")
 
         for idx, image_file in enumerate(image_files, 1):
+            if stop_event is not None and stop_event.is_set():
+                not_started = image_files[idx - 1:]
+                print(f"\nStopped by the user: {len(not_started)} images not started")
+                log.write(f"\nStopped by the user: {len(not_started)} images not started\n")
+                break
             input_path = os.path.join(input_folder, image_file)
             print(f"\n\n🖼️ Processing image {idx}/{len(image_files)}: {image_file}")
             log.write(f"\nProcessing image {idx}/{len(image_files)}: {image_file}\n")
@@ -677,6 +694,7 @@ def process_folder(
                 log.write(f"Status: Failed - {str(e)}\n")
                 failed_conversions += 1
                 failed_files.append(image_file)
+                errors[image_file] = str(e)
                 
                 # Update progress even on error
                 if progress_callback:
@@ -702,6 +720,8 @@ def process_folder(
             log.write("\nFailed files:\n")
             for file in failed_files:
                 log.write(f"- {file}\n")
+
+    image_files = [f for f in image_files if f not in not_started]
 
     # Print summary to console
     print("\n📊 Processing Summary:")
@@ -801,6 +821,9 @@ def process_folder(
         'successful': successful_conversions,
         'failed': failed_conversions,
         'failed_files': failed_files,
+        'errors': errors,
+        'not_started': not_started,
+        'stopped': bool(not_started),
         'average_time': sum(processing_times)/len(processing_times) if processing_times else 0,
         'log_file': log_file,
         'comparison_dir': comparison_dir,

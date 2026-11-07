@@ -90,11 +90,11 @@ Benchmarks per GPU are in the [Model Zoo](https://lrncrd.github.io/PyPottery/pyp
 
 ## 🎯 Usage
 
-1. **Check your hardware** in the *Hardware Check* tab
-2. **Download a model** from *Model Management* (or upload your own)
-3. **Test settings** on a single drawing in *Model Diagnostics*
-4. *(Optional)* **Preprocess**: compute dataset statistics and apply suggested optimizations
-5. **Batch process** a folder of drawings and follow the real-time progress
+1. **Create a project** in the *Projects* tab and **add your drawings** (files or a whole folder). Every other tab works on the drawings of the open project.
+2. **Check your hardware** in the *Hardware Check* tab
+3. *(Optional)* **Preprocess**: bring brightness and contrast close to the training data; the original is kept
+4. **Test settings** on up to five drawings in *Model Diagnostics*
+5. **Batch ink** the drawings and follow the real-time progress
 
 For the full walkthrough, see the **[Usage Guide](https://lrncrd.github.io/PyPottery/pypotteryink/usage.html)**. Something not working? See the [Getting Started guide](https://lrncrd.github.io/PyPottery/pypotteryink/index.html#troubleshooting) and the tips in [Advanced](https://lrncrd.github.io/PyPottery/pypotteryink/advanced.html).
 
@@ -103,9 +103,21 @@ For the full walkthrough, see the **[Usage Guide](https://lrncrd.github.io/PyPot
 The *Cloud Inking* tab is a second, optional workflow next to the local one. Instead of the fine-tuned pix2pix-turbo models it sends each drawing to a general-purpose image-editing model (GPT Image 2, or any other OpenRouter model id) and returns an ink drawing of the same size, optionally registered onto the pencil lines.
 
 - **No GPU, no model download**: you only need an [OpenRouter](https://openrouter.ai/keys) API key and credits. A drawing costs roughly 0.05 $ with GPT Image 2; the real cost of every image is shown while it runs and saved in the log.
-- **Stippling style**: *Fine* (small dots) or *Coarse* (larger, bolder dots), plus 1-4 versions per drawing and a stop-at-budget limit.
+- **Stippling style**: *Fine* (small dots) or *Coarse* (larger, bolder dots), plus 1-4 versions per drawing, a stop-at-budget limit and an optional reference drawing to show the style you want (a pencil drawing with its inked version, a sheet with both, or just one inked drawing to copy the style from). In our benchmark a reference did not improve GPT Image 2 on average, and it is sent to the provider like the drawings.
 - **Your drawings leave the computer**: each image is sent to OpenRouter and to the company that runs the model. The API key stays in memory for the session and is never saved. The local workflow in the other tabs stays fully offline, and remains the right choice for unpublished material you cannot share.
 - Only GPT Image 2 is offered by default because it gave the best results in our benchmark; models you add by id were not tested and were mostly worse.
+
+## 📁 Projects
+
+Everything happens inside a project: open one (or create it) in the *Projects* tab before using the other tabs.
+
+- **One library per project**: drawings are added once (files, a folder, or dragged onto the page) and copied into the project, so a project never mixes drawings from elsewhere. The same image added twice is recognised by its content and not copied again; a different image with the same name gets a numbered name.
+- **Every tab picks from the library**: Preprocessing, Model Diagnostics, Batch Inking and Cloud Inking show the project's drawings as a grid to select from. In the two inking tabs the default view is *To ink with these settings*: drawings already inked with the settings on screen are left out, *Already inked* shows them, and each tile tells when a drawing was inked only with other settings (hover it to see which).
+- **Preprocessing keeps the original**: it makes a corrected version next to it, used for inking when *Use the preprocessed version* is on. Drawings already within range get no corrected version. Statistics files you add or calculate are saved in the project.
+- **One folder per settings**: results go to `projects/<project>/outputs/local/<settings>` or `.../cloud/<settings>`, for example `6h-MCG-Model_p512_o64_c1_x1`, with `_pre` added when the preprocessed version was used. The same settings replace only their own earlier results; other settings never overwrite each other.
+- **External copy (optional)**: set a second folder in the project settings, such as a shared drive, and every run is also copied there in a folder with the same name. The project always keeps its own copy, so an unreachable drive only shows a warning.
+- **Run history**: every run is listed with its parameters, folders, failed drawings and, for cloud runs, the cost. The style reference of a cloud run is kept with the project. The API key is never saved.
+- Projects live in the `projects/` folder, the same layout as the other PyPottery apps, so the Launcher's backup and restore includes them.
 
 ## 🤖 Available Models
 
