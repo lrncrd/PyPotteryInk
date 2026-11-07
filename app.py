@@ -44,6 +44,7 @@ if sys.platform == "win32":
         pass
 
 from flask import Flask, render_template, request, jsonify, send_file, session, Response
+from werkzeug.utils import secure_filename
 from pathlib import Path
 from hardware_check import HardwareChecker
 from typing import Dict, Optional
