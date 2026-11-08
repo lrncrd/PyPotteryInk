@@ -44,6 +44,7 @@ if sys.platform == "win32":
         pass
 
 from flask import Flask, render_template, request, jsonify, send_file, session, Response
+from werkzeug.utils import secure_filename
 from pathlib import Path
 from hardware_check import HardwareChecker
 from typing import Dict, Optional
@@ -53,8 +54,7 @@ import base64
 import requests
 import time
 import json
-from werkzeug.utils import secure_filename
-from PIL import Image
+from PIL import Image, ImageOps
 import numpy as np
 import re
 import threading
@@ -64,12 +64,13 @@ import cloud
 from ink import process_folder, process_single_image
 from models import _MODELS_CACHE_DIR
 from preprocessing import DatasetAnalyzer, apply_recommended_adjustments, check_image_quality
+from project_manager import ProjectManager, config_label
+import uuid
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'pypotteryink_secret_key_2025'  # Change this in production
 app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max upload
-app.config['UPLOAD_FOLDER'] = 'temp_uploads'
-app.config['OUTPUT_FOLDER'] = 'temp_output'
 
 # Global progress tracking
 progress_queues = {}
@@ -129,8 +130,6 @@ MODELS = {
 # Create models folder if it doesn't exist
 MODELS_DIR = "models"
 os.makedirs(MODELS_DIR, exist_ok=True)
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
 
 def download_model(model_name, session_id=None):
     """Download the selected model if it doesn't already exist. If session_id
@@ -178,12 +177,180 @@ def download_model(model_name, session_id=None):
         print(f"✅ {model_name} already exists")
         return model_path, model_info["prompt"]
 
-def clear_temp_dirs():
-    """Clean temporary directories."""
-    for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER']]:
-        if os.path.exists(folder):
-            shutil.rmtree(folder)
-        os.makedirs(folder, exist_ok=True)
+# ==================== PROJECTS ====================
+# Run history per project (which drawings were inked, with which parameters).
+# A drawing is identified by the SHA-1 of its bytes, computed by the server when
+# it is imported into the project library.
+project_manager = ProjectManager(projects_root="projects")
+RUNS_FOLDER = 'temp_runs'   # one scratch folder per run, removed when the run ends
+
+def _move(src, dst):
+    """Move a file, replacing dst. os.replace when on the same drive, copy + delete otherwise."""
+    try:
+        os.replace(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
+        os.remove(src)
+
+def _stage_selection(project_id, names, use_preprocessed, limit=None):
+    """Link (or copy) the selected library drawings into a fresh run folder, which is what the
+    unchanged run engines read. Each drawing is read in its preprocessed version when asked for
+    and available. Returns (run_dir, input_dir, entries[{name, sha1, version}]). Raises ValueError."""
+    if not isinstance(names, list) or not names:
+        raise ValueError("Select at least one drawing from the project.")
+    names = list(dict.fromkeys(str(n) for n in names))
+    if limit and len(names) > limit:
+        raise ValueError(f"Select at most {limit} drawings.")
+    library = project_manager.get_project(project_id)['drawings']
+    run_dir = Path(RUNS_FOLDER) / uuid.uuid4().hex
+    input_dir = run_dir / 'input'
+    input_dir.mkdir(parents=True)
+    entries = []
+    try:
+        for name in names:
+            if name not in library:
+                raise ValueError(f"{name} is not in this project's library.")
+            src, version = project_manager.input_path(project_id, name, use_preprocessed)
+            if src is None:
+                raise ValueError(f"{name} is missing from the project folder.")
+            try:
+                os.link(src, input_dir / name)
+            except OSError:
+                shutil.copy2(src, input_dir / name)
+            entries.append({"name": name, "sha1": library[name]['sha1'], "version": version})
+    except Exception:
+        shutil.rmtree(run_dir, ignore_errors=True)
+        raise
+    return run_dir, input_dir, entries
+
+def _place_outputs(project_id, mode, params, scratch, entries, produced, comparisons=False):
+    """Move a run's results from its scratch folder to outputs/<mode>/<label>/. The label comes from the
+    settings and from the version (original or preprocessed) each drawing was read in, so the same settings
+    replace only their own earlier results and different settings never touch each other.
+    `produced` maps a drawing name to the files the run made for it. Returns the run items."""
+    items = []
+    for entry in entries:
+        label = config_label(mode, dict(params, input=entry['version']))
+        dest = project_manager.outputs_dir(project_id, mode, label)
+        files = [f for f in produced.get(entry['name'], []) if (scratch / f).is_file()]
+        if files:
+            dest.mkdir(parents=True, exist_ok=True)
+        for f in files:
+            _move(scratch / f, dest / f)
+            comparison = scratch / 'comparisons' / f'comparison_{f}'
+            if comparisons and comparison.is_file():
+                (dest / 'comparisons').mkdir(exist_ok=True)
+                _move(comparison, dest / 'comparisons' / comparison.name)
+        items.append({"source": entry['name'], "sha1": entry['sha1'], "version": entry['version'],
+                      "config": f"{mode}/{label}", "outputs": files, "status": "ok" if files else "failed"})
+    logs = scratch / 'logs'
+    if logs.is_dir():
+        target = project_manager.outputs_dir(project_id, mode) / 'logs'
+        target.mkdir(parents=True, exist_ok=True)
+        for f in logs.iterdir():
+            _move(f, target / f.name)
+    return items
+
+def _rescue_scratch(project_id, mode, scratch):
+    """Last resort when results could not be sorted into their folders: keep them all, never lose a run."""
+    rescue = project_manager.outputs_dir(project_id, mode) / f"recovered_{datetime.now():%Y%m%d_%H%M%S}"
+    shutil.copytree(scratch, rescue, dirs_exist_ok=True)
+    return str(rescue)
+
+def _mirror_items(project_id, mode, items):
+    """Second copy of a run in the project's external folder, if one is set: same folder names."""
+    external_dir = project_manager.get_project(project_id)['settings'].get('external_dir')
+    if not external_dir:
+        return None
+    report = {"dir": external_dir, "copied": 0, "error": None}
+    by_label = {}
+    for item in items:
+        by_label.setdefault(item['config'].split('/', 1)[1], []).extend(item['outputs'])
+    for label, files in by_label.items():
+        if not files:
+            continue
+        result = _mirror_external(external_dir, label, project_manager.outputs_dir(project_id, mode, label), files)
+        report["copied"] += result["copied"]
+        report["error"] = report["error"] or result["error"]
+    return report
+
+def _result_folder(project_id, mode, items):
+    """The folder 'Open output folder' opens: the settings folder, or the mode folder when a run filled two."""
+    labels = {i['config'] for i in items if i['outputs']}
+    if len(labels) == 1:
+        return str(project_manager.outputs_dir(project_id, mode, labels.pop().split('/', 1)[1]))
+    return str(project_manager.outputs_dir(project_id, mode))
+
+def _number(value):
+    """Parameters arrive from the form as strings; keep them as numbers in the history."""
+    try:
+        number = float(value)
+        return int(number) if number.is_integer() else number
+    except (TypeError, ValueError):
+        return value
+
+def _require_project(data):
+    """(project_id, None) or (None, error response): every tab works inside a project."""
+    project_id = (data or {}).get('project_id')
+    if not project_id:
+        return None, (jsonify({"success": False, "error": "Open a project first."}), 400)
+    if project_manager.get_project_path(project_id) is None:
+        return None, (jsonify({"success": False, "error": "Unknown project: open or create it again."}), 400)
+    project_manager.ensure_folders(project_id)
+    return project_id, None
+
+# Parameters that decide a run's results. They name the project output folder (config_label), and
+# the same function serves the run and the browser's "done with these settings?" check.
+def _local_params(data, session_model_name=None):
+    model = data.get('model_name')
+    if model == 'custom':
+        model = secure_filename(data.get('custom_model_name') or '') or session_model_name or 'custom'
+    return {
+        "model": model,
+        "patch_size": _number(data.get('patch_size', 512)),
+        "overlap": _number(data.get('overlap', 64)),
+        "contrast_scale": _number(data.get('contrast_scale', 1.0)),
+        "upscale": _number(data.get('upscale', 1)),
+        "use_fp16": bool(data.get('use_fp16', False)),
+    }
+
+def _cloud_params(data):
+    model = (data.get('model') or '').strip()
+    if model == 'custom':
+        model = (data.get('custom_model') or '').strip()
+    try:
+        variants = max(1, min(int(data.get('variants', 1)), cloud.MAX_VARIANTS))
+    except (TypeError, ValueError):
+        variants = 1
+    try:
+        budget = float(data['budget_usd']) if data.get('budget_usd') not in (None, '') else None
+    except (TypeError, ValueError):
+        budget = None
+    reference = data.get('reference', 'none')
+    ref_hash = re.sub(r'[^0-9a-f]', '', str(data.get('reference_hash') or '').lower())[:40]
+    return {
+        "model": model, "style": data.get('style', 'fine'), "variants": variants,
+        "extra_prompt": str(data.get('extra_prompt') or '')[:1000],
+        "reference": reference, "reference_hash": ref_hash if reference != 'none' else '',
+        "align": bool(data.get('align', False)),
+        "budget_usd": budget if budget and budget > 0 else None,
+    }
+
+def _mirror_external(external_dir, label, output_dir, filenames):
+    """Second copy of a run's output files in the user's own folder, `<external>/<label>/`.
+    Never raises: the project copy is the real result, so a missing drive only becomes a warning."""
+    target = os.path.join(external_dir, label)
+    copied, error = 0, None
+    try:
+        os.makedirs(target, exist_ok=True)
+        for name in filenames:
+            src = os.path.join(output_dir, name)
+            if os.path.isfile(src):
+                shutil.copy2(src, os.path.join(target, name))   # same settings = same folder: replaces
+                copied += 1
+    except Exception as e:
+        error = str(e)
+    return {"dir": target, "copied": copied, "error": error}
 
 # ==================== AUTO-SHUTDOWN WATCHDOG & BEACON ====================
 _shutdown_lock = threading.Lock()
@@ -524,31 +691,140 @@ def get_models():
         })
     return jsonify({"success": True, "models": models_list})
 
-@app.route('/api/upload-images', methods=['POST'])
-def upload_images():
-    """Handle image uploads"""
+@app.route('/api/projects', methods=['GET'])
+def list_projects():
+    return jsonify({"success": True, "projects": project_manager.list_projects()})
+
+@app.route('/api/projects', methods=['POST'])
+def create_project():
+    data = request.json or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({"success": False, "error": "Give the project a name."}), 400
     try:
-        clear_temp_dirs()
-        
-        files = request.files.getlist('files')
-        if not files:
-            return jsonify({"success": False, "error": "No files uploaded"}), 400
-        
-        uploaded_files = []
-        for file in files:
-            if file.filename:
-                filename = secure_filename(file.filename)
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(filepath)
-                uploaded_files.append(filename)
-        
-        return jsonify({
-            "success": True,
-            "files": uploaded_files,
-            "count": len(uploaded_files)
-        })
+        project = project_manager.create_project(name[:80], (data.get('description') or '').strip()[:500])
+        return jsonify({"success": True, "project": project})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/projects/<project_id>', methods=['GET'])
+def get_project(project_id):
+    project = project_manager.get_project(project_id)
+    if project is None:
+        return jsonify({"success": False, "error": "Project not found."}), 404
+    return jsonify({
+        "success": True, "project": project,
+        "path": str(project_manager.get_project_path(project_id).resolve()),
+        "outputs": {mode: str(project_manager.outputs_dir(project_id, mode)) for mode in ('local', 'cloud')},
+    })
+
+@app.route('/api/projects/<project_id>', methods=['DELETE'])
+def delete_project(project_id):
+    if not project_manager.delete_project(project_id):
+        return jsonify({"success": False, "error": "Project not found."}), 404
+    return jsonify({"success": True})
+
+@app.route('/api/projects/<project_id>/drawings', methods=['GET'])
+def project_drawings(project_id):
+    drawings = project_manager.list_drawings(project_id)
+    if drawings is None:
+        return jsonify({"success": False, "error": "Project not found."}), 404
+    return jsonify({"success": True, "drawings": drawings})
+
+@app.route('/api/projects/<project_id>/drawings', methods=['POST'])
+def import_drawings(project_id):
+    """Add drawings to the project library (multipart field `files`). Duplicates are not copied twice."""
+    if project_manager.get_project_path(project_id) is None:
+        return jsonify({"success": False, "error": "Project not found."}), 404
+    project_manager.ensure_folders(project_id)
+    report = {"added": [], "renamed": [], "duplicate": [], "skipped": []}
+    for file in request.files.getlist('files'):
+        if not file or not file.filename:
+            continue
+        try:
+            result = project_manager.import_drawing(project_id, file.filename, file.stream)
+        except Exception as e:
+            result = {"status": "skipped", "name": file.filename, "reason": str(e)}
+        report[result["status"]].append(result)
+    return jsonify({"success": True, "report": report, "drawings": project_manager.list_drawings(project_id)})
+
+@app.route('/api/projects/<project_id>/drawings/<path:name>', methods=['DELETE'])
+def remove_drawing(project_id, name):
+    if not project_manager.remove_drawing(project_id, name):
+        return jsonify({"success": False, "error": "Drawing not found."}), 404
+    return jsonify({"success": True})
+
+@app.route('/api/projects/<project_id>/thumb/<version>/<path:name>')
+def drawing_thumbnail(project_id, version, name):
+    try:
+        thumb = project_manager.thumbnail(project_id, name, version)
+    except Exception:
+        thumb = None   # unreadable image: the browser shows its placeholder
+    if thumb is None:
+        return jsonify({"error": "Not found"}), 404
+    return send_file(os.path.abspath(thumb), mimetype='image/png', max_age=0)
+
+@app.route('/api/projects/<project_id>/file/<area>/<path:relpath>')
+def project_file(project_id, area, relpath):
+    """Files of a project for the galleries: drawings, inked outputs, comparisons, diagnostics.
+    The resolved path must stay inside that project area."""
+    base = project_manager.area_dir(project_id, area)
+    if base is None:
+        return jsonify({"error": "Not found"}), 404
+    target = (base / relpath).resolve()
+    if base not in target.parents or not target.is_file():
+        return jsonify({"error": "Not found"}), 404
+    return send_file(str(target), max_age=0)
+
+@app.route('/api/projects/<project_id>/status', methods=['POST'])
+def project_status(project_id):
+    """For the settings on screen: which output folder each drawing would go to, and whether the project
+    already inked it there ('same'), only with other settings ('other') or never ('none')."""
+    metadata = project_manager.get_project(project_id)
+    if metadata is None:
+        return jsonify({"success": False, "error": "Project not found."}), 404
+    data = request.json or {}
+    mode = data.get('mode')
+    if mode == 'local':
+        params = _local_params(data)
+    elif mode == 'cloud':
+        params = _cloud_params(data)
+    else:
+        return jsonify({"success": False, "error": "Unknown mode."}), 400
+    use_preprocessed = bool(data.get('use_preprocessed', True))
+    labels = {v: f"{mode}/{config_label(mode, dict(params, input=v))}" for v in ('original', 'preprocessed')}
+    index = project_manager.processed_index(project_id)
+    status = {}
+    for name, info in metadata['drawings'].items():
+        version = 'preprocessed' if use_preprocessed and info.get('preprocessed') else 'original'
+        records = index.get(info.get('sha1'), {})
+        if labels[version] in records:
+            entry = {"state": "same", "record": records[labels[version]]}
+        elif records:
+            entry = {"state": "other", "record": max(records.values(), key=lambda r: r.get('timestamp') or '')}
+        else:
+            entry = {"state": "none"}
+        entry["version"] = version
+        status[name] = entry
+    return jsonify({"success": True, "labels": labels, "drawings": status})
+
+@app.route('/api/projects/<project_id>/settings', methods=['PATCH'])
+def project_settings(project_id):
+    """Project settings: today only `external_dir`, the optional second copy of every run's outputs."""
+    if project_manager.get_project_path(project_id) is None:
+        return jsonify({"success": False, "error": "Project not found."}), 404
+    data = request.json or {}
+    if 'external_dir' not in data:
+        return jsonify({"success": False, "error": "Nothing to update."}), 400
+    external_dir = str(data['external_dir'] or '').strip()
+    if external_dir:
+        try:
+            os.makedirs(external_dir, exist_ok=True)
+        except OSError as e:
+            return jsonify({"success": False, "error": f"Cannot use that folder: {e}"}), 400
+        external_dir = os.path.abspath(external_dir)
+    settings = project_manager.update_settings(project_id, {'external_dir': external_dir})
+    return jsonify({"success": True, "settings": settings})
 
 @app.route('/api/upload-custom-model', methods=['POST'])
 def upload_custom_model():
@@ -597,41 +873,52 @@ def upload_stats():
         if not stats_file.filename.lower().endswith('.npy'):
             return jsonify({"success": False, "error": "Only .npy files are supported"}), 400
 
+        project_id = request.form.get('project_id')
+        if project_manager.get_project_path(project_id) is None:
+            return jsonify({"success": False, "error": "Open a project first."}), 400
+        project_manager.ensure_folders(project_id)
         filename = secure_filename(stats_file.filename)
-        stats_dir = os.path.join(app.config.get('UPLOAD_FOLDER', 'temp_uploads'), 'stats')
-        os.makedirs(stats_dir, exist_ok=True)
-        stats_path = os.path.join(stats_dir, filename)
-        stats_file.save(stats_path)
+        stats_file.save(str(project_manager.get_project_path(project_id) / 'stats' / filename))
 
         return jsonify({
             "success": True,
-            "stats_path": stats_path,
-            "message": f"Statistics file '{filename}' uploaded successfully"
+            "stats_name": filename,
+            "message": f"Statistics file '{filename}' added to the project"
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+local_stops = {}
+
+@app.route('/api/process-images/stop/<session_id>', methods=['POST'])
+def process_images_stop(session_id):
+    """Stop a local batch after the drawing being inked; what is done so far is kept."""
+    event = local_stops.get(session_id)
+    if event is None:
+        return jsonify({"success": False, "error": "No running batch with this id."}), 404
+    event.set()
+    return jsonify({"success": True})
+
 @app.route('/api/process-images', methods=['POST'])
 def process_images():
-    """Process uploaded images with the selected model"""
+    """Ink the selected drawings of the project with the local model. Results go to
+    outputs/local/<settings>/ inside the project and the run is added to its history."""
     try:
         data = request.json
         if not data:
             return jsonify({"success": False, "error": "Invalid request data"}), 400
-        
+
+        project_id, project_error = _require_project(data)
+        if project_error:
+            return project_error
+
         model_name = data.get('model_name')
-        output_dir = data.get('output_dir', app.config['OUTPUT_FOLDER'])
         use_fp16 = data.get('use_fp16', False)
         contrast_scale = data.get('contrast_scale', 1.0)
         patch_size = data.get('patch_size', 512)
         overlap = data.get('overlap', 64)
         upscale = data.get('upscale', 1)
-        
-        # Create output directory
-        os.makedirs(output_dir, exist_ok=True)
-
-        # Store the output directory in session for image serving
-        session['last_output_dir'] = output_dir
+        use_preprocessed = bool(data.get('use_preprocessed', True))
 
         # Custom model path can be resolved now (no download involved); the
         # preset-model path/prompt (which may require a download) is instead
@@ -643,10 +930,21 @@ def process_images():
             custom_model_path = session.get('custom_model_path')
             if not custom_model_path or not os.path.exists(custom_model_path):
                 return jsonify({"success": False, "error": "Custom model not uploaded or not found"}), 400
+        elif model_name not in MODELS:
+            return jsonify({"success": False, "error": "Unknown model."}), 400
+
+        try:
+            run_dir, input_dir, entries = _stage_selection(project_id, data.get('drawings'), use_preprocessed)
+        except ValueError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+        scratch = run_dir / 'out'
+        run_params = dict(_local_params(data, session.get('custom_model_name')), use_preprocessed=use_preprocessed)
 
         # Create a unique session ID for this processing job
         session_id = str(int(time.time() * 1000))
         progress_queues[session_id] = Queue()
+        stop_event = threading.Event()
+        local_stops[session_id] = stop_event
 
         # Progress callback function with two progress bars
         def progress_callback(progress, message, patch_progress=None, patch_message=None):
@@ -689,19 +987,17 @@ def process_images():
                 # the first time a model is loaded - monitor the HF cache
                 # dir for real progress while process_folder loads it.
                 sdturbo_stop_event = threading.Event()
-                sdturbo_monitor = None
                 if not _is_sdturbo_cached():
-                    sdturbo_monitor = threading.Thread(
+                    threading.Thread(
                         target=_monitor_sdturbo_download, args=(session_id, sdturbo_stop_event), daemon=True
-                    )
-                    sdturbo_monitor.start()
+                    ).start()
 
                 try:
                     results = process_folder(
-                        input_folder=app.config['UPLOAD_FOLDER'],
+                        input_folder=str(input_dir),
                         model_path=model_path,
                         prompt=prompt,
-                        output_dir=output_dir,
+                        output_dir=str(scratch),
                         use_fp16=use_fp16,
                         contrast_scale=contrast_scale,
                         patch_size=patch_size,
@@ -709,25 +1005,53 @@ def process_images():
                         upscale=upscale,
                         progress_callback=progress_callback,
                         export_elements=False,  # Removed SVG export
-                        export_svg=False  # Removed SVG export
+                        export_svg=False,  # Removed SVG export
+                        stop_event=stop_event
                     )
                 finally:
                     sdturbo_stop_event.set()
 
-                # Get processed images
-                processed_images = []
-                comparison_images = []
+                if not results:  # process_folder returns None when the folder holds no images
+                    progress_queues[session_id].put({
+                        'progress': 0,
+                        'message': 'No images found to process.',
+                        'error': True
+                    })
+                    return
 
-                for file in os.listdir(output_dir):
-                    if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                        processed_images.append(file)
+                # A stopped run records only the drawings it started; the others stay "to ink"
+                not_started = set(results.get('not_started') or [])
+                run_entries = [e for e in entries if e['name'] not in not_started]
 
-                # Check for comparison images
-                comparison_dir = os.path.join(output_dir, 'comparisons')
-                if os.path.exists(comparison_dir):
-                    for file in os.listdir(comparison_dir):
-                        if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                            comparison_images.append(file)
+                # process_folder names each output like its input
+                try:
+                    items = _place_outputs(project_id, 'local', run_params, scratch, run_entries,
+                                           {e['name']: [e['name']] for e in run_entries}, comparisons=True)
+                except Exception as e:
+                    rescued = _rescue_scratch(project_id, 'local', scratch)
+                    raise RuntimeError(f"the results could not be sorted ({e}); they are all in {rescued}")
+                external_result = None
+                try:
+                    external_result = _mirror_items(project_id, 'local', items)
+                    extra = {"average_time": round(results.get('average_time', 0), 1)}
+                    if not_started:
+                        extra["stopped"] = f"stopped by the user, {len(not_started)} not started"
+                    if external_result:
+                        extra["external"] = external_result
+                    if items:
+                        project_manager.add_run(project_id, 'local', run_params, items,
+                                                output_dir=_result_folder(project_id, 'local', items), extra=extra)
+                except Exception as e:  # the images are already inked: a history problem is not a failed run
+                    print(f"Could not record the run in project {project_id}: {e}")
+
+                # Paths relative to the project's outputs/ folder, served by /api/projects/<id>/file/outputs/...
+                processed_images, comparison_images = [], []
+                for item in items:
+                    for f in item['outputs']:
+                        processed_images.append(f"{item['config']}/{f}")
+                        if (project_manager.outputs_dir(project_id, 'local', item['config'].split('/', 1)[1])
+                                / 'comparisons' / f'comparison_{f}').is_file():
+                            comparison_images.append(f"{item['config']}/comparisons/comparison_{f}")
 
                 # Send final result
                 progress_queues[session_id].put({
@@ -737,11 +1061,15 @@ def process_images():
                     'results': {
                         'successful': results.get('successful', 0),
                         'failed': results.get('failed', 0),
+                        'not_started': len(not_started),
+                        # one line per distinct reason, so a run where everything failed says why
+                        'errors': sorted(set((results.get('errors') or {}).values()))[:3],
                         'average_time': results.get('average_time', 0),
                         'processed_images': processed_images,
                         'comparison_images': comparison_images,
-                        'output_dir': output_dir,
-                        'log_file': results.get('log_file', '')
+                        'output_dir': _result_folder(project_id, 'local', items),
+                        'folders': sorted({i['config'] for i in items if i['outputs']}),
+                        'external': external_result
                     }
                 })
             except Exception as e:
@@ -750,15 +1078,19 @@ def process_images():
                     'message': f'Error: {str(e)}',
                     'error': True
                 })
+            finally:
+                local_stops.pop(session_id, None)
+                shutil.rmtree(run_dir, ignore_errors=True)
 
         # Start background processing
         thread = threading.Thread(target=process_in_background)
         thread.daemon = True
         thread.start()
-        
+
         return jsonify({
             "success": True,
             "session_id": session_id,
+            "images": len(entries),
             "message": "Processing started"
         })
     except Exception as e:
@@ -771,6 +1103,90 @@ def process_images():
 # arguments of the running batch (never in the session cookie, a file or a log).
 # ---------------------------------------------------------------------------
 cloud_cancels = {}
+# Style reference of the cloud workflow (kept in its own scratch folder).
+CLOUD_REFERENCE_FOLDER = 'temp_cloud_reference'
+CLOUD_REFERENCE_FILES = {"sheet": ["sheet"], "pair": ["pencil", "ink"], "style": ["style"]}
+
+def _load_cloud_reference(mode):
+    """The saved reference images for `mode`, in the order the prompt expects. Raises ValueError."""
+    if mode == 'none':
+        return []
+    images = []
+    for slot in CLOUD_REFERENCE_FILES[mode]:
+        path = os.path.join(CLOUD_REFERENCE_FOLDER, f"{mode}_{slot}.png")
+        if not os.path.exists(path):
+            raise ValueError("Add the reference drawing first (or switch the reference off).")
+        images.append(Image.open(path).convert('L'))
+    return images
+
+@app.route('/api/cloud/upload-reference', methods=['POST'])
+def cloud_upload_reference():
+    """Save the optional style reference: mode 'sheet' (field `sheet`), 'pair' (fields `pencil` and `ink`)
+    or 'style' (field `style`: one inked drawing)."""
+    try:
+        mode = request.form.get('mode', '')
+        if mode not in CLOUD_REFERENCE_FILES:
+            return jsonify({"success": False, "error": "Unknown reference type."}), 400
+        os.makedirs(CLOUD_REFERENCE_FOLDER, exist_ok=True)
+        for old in os.listdir(CLOUD_REFERENCE_FOLDER):
+            os.remove(os.path.join(CLOUD_REFERENCE_FOLDER, old))
+        for slot in CLOUD_REFERENCE_FILES[mode]:
+            file = request.files.get(slot)
+            if not file or not file.filename:
+                return jsonify({"success": False, "error": "Missing reference image."}), 400
+            try:
+                img = ImageOps.exif_transpose(Image.open(file.stream)).convert('L')
+            except Exception:
+                return jsonify({"success": False, "error": f"{secure_filename(file.filename)} is not a readable image."}), 400
+            img.save(os.path.join(CLOUD_REFERENCE_FOLDER, f"{mode}_{slot}.png"))
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+def _record_cloud_run(project_id, results, run_params, scratch, entries):
+    """Move a finished cloud run into the project, add it to the history and mirror it to the external
+    folder, if any. Adds the gallery paths to `results`. Never stores the API key."""
+    produced, by_file = {}, {}
+    for item in results.get('items', []):
+        produced.setdefault(item['source'], []).append(item['file'])
+        by_file[item['file']] = item
+    items = _place_outputs(project_id, 'cloud', run_params, scratch, entries, produced)
+    for item in items:
+        outs = [by_file[f] for f in item['outputs'] if f in by_file]
+        item["seconds"] = round(sum(float(o['seconds'] or 0) for o in outs), 1)
+        item["cost_usd"] = round(sum(float(o['cost_usd'] or 0) for o in outs), 4)
+
+    # gallery: each ink version next to the pencil it was made from, as project file paths
+    versions = {i['source']: i['version'] for i in items}
+    configs = {i['source']: i['config'] for i in items}
+    for item in results.get('items', []):
+        item['input_path'] = f"{versions.get(item['source'], 'original')}/{item['source']}"
+        item['output_path'] = f"{configs.get(item['source'])}/{item['file']}"
+    results['output_dir'] = _result_folder(project_id, 'cloud', items)
+    results['folders'] = sorted({i['config'] for i in items if i['outputs']})
+    results['log_file'] = ''
+
+    try:
+        params = dict(run_params, prompt_hash=results.get('prompt_hash'))
+        # keep a copy of the style reference with the project, so the run can be reproduced later
+        reference = run_params['reference']
+        if reference != 'none':
+            label = config_label('cloud', dict(run_params, input='original'))
+            ref_dir = Path(project_manager.get_project_path(project_id)) / 'references' / label
+            ref_dir.mkdir(parents=True, exist_ok=True)
+            for slot in CLOUD_REFERENCE_FILES[reference]:
+                src = os.path.join(CLOUD_REFERENCE_FOLDER, f"{reference}_{slot}.png")
+                if os.path.exists(src):
+                    shutil.copy2(src, ref_dir / f"{reference}_{slot}.png")
+            params["reference_dir"] = f"references/{label}"
+        external_result = _mirror_items(project_id, 'cloud', items)
+        results['external'] = external_result
+        extra = {"cost_usd": results.get('cost_usd'), "stopped": results.get('stopped')}
+        if external_result:
+            extra["external"] = external_result
+        project_manager.add_run(project_id, 'cloud', params, items, output_dir=results['output_dir'], extra=extra)
+    except Exception as e:  # a history problem must never turn a paid, finished run into an error
+        print(f"Could not record the cloud run in project {project_id}: {e}")
 
 @app.route('/api/cloud/catalog', methods=['GET'])
 def cloud_catalog():
@@ -780,6 +1196,9 @@ def cloud_catalog():
 def cloud_start():
     try:
         data = request.json or {}
+        project_id, project_error = _require_project(data)
+        if project_error:
+            return project_error
         api_key = (data.get('api_key') or '').strip()
         if not api_key:
             return jsonify({"success": False, "error": "Enter your OpenRouter API key first."}), 400
@@ -802,16 +1221,23 @@ def cloud_start():
         if budget is not None and budget <= 0:
             budget = None
         extra = str(data.get('extra_prompt') or '')[:1000]
-        do_align = bool(data.get('align', True))
-        output_dir = data.get('output_dir') or './enhanced_pottery_cloud'
+        reference = data.get('reference', 'none')
+        if reference not in cloud.REFERENCE_MODES:
+            return jsonify({"success": False, "error": "Unknown reference type."}), 400
+        try:
+            reference_images = _load_cloud_reference(reference)
+        except ValueError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+        do_align = bool(data.get('align', False))
+        use_preprocessed = bool(data.get('use_preprocessed', True))
 
-        in_dir = Path(app.config['UPLOAD_FOLDER'])
-        n_images = len([p for p in in_dir.iterdir() if p.suffix.lower() in cloud.IMAGE_EXTS]) if in_dir.exists() else 0
-        if n_images == 0:
-            return jsonify({"success": False, "error": "Upload at least one drawing first."}), 400
-
-        os.makedirs(output_dir, exist_ok=True)
-        session['last_output_dir'] = output_dir
+        try:
+            run_dir, input_dir, entries = _stage_selection(project_id, data.get('drawings'), use_preprocessed)
+        except ValueError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+        scratch = run_dir / 'out'
+        run_params = dict(_cloud_params(data), use_preprocessed=use_preprocessed)
+        n_images = len(entries)
 
         session_id = 'cloud' + str(int(time.time() * 1000))
         progress_queues[session_id] = Queue()
@@ -829,15 +1255,22 @@ def cloud_start():
         def run():
             try:
                 results = cloud.run_batch(
-                    api_key=api_key, input_folder=str(in_dir), output_dir=output_dir, model=model,
+                    api_key=api_key, input_folder=str(input_dir), output_dir=str(scratch), model=model,
                     style=style, variants=variants, extra=extra, do_align=do_align, budget_usd=budget,
-                    progress=on_progress, cancel=cancel)
+                    progress=on_progress, cancel=cancel,
+                    reference=reference, reference_images=reference_images)
+                try:
+                    _record_cloud_run(project_id, results, run_params, scratch, entries)
+                except Exception as e:   # paid results: keep them even if sorting them fails
+                    print(f"Could not sort the cloud results into project {project_id}: {e}")
+                    results['output_dir'] = _rescue_scratch(project_id, 'cloud', scratch)
                 progress_queues[session_id].put({
                     'progress': 100, 'message': 'Processing completed!', 'completed': True, 'results': results})
             except Exception as e:
                 progress_queues[session_id].put({'progress': 0, 'message': f'Error: {e}', 'error': True})
             finally:
                 cloud_cancels.pop(session_id, None)
+                shutil.rmtree(run_dir, ignore_errors=True)
 
         threading.Thread(target=run, daemon=True).start()
         return jsonify({
@@ -882,34 +1315,25 @@ def get_progress(session_id):
 
 @app.route('/api/diagnostics', methods=['POST'])
 def run_diagnostics():
-    """Run diagnostics on uploaded images"""
+    """Patch and contrast diagnostics on up to 5 drawings of the project; output in diagnostics/<time>/."""
     try:
-        # Accept JSON or form-encoded data; be resilient if Content-Type is missing
         data = request.get_json(silent=True)
-        if data is None:
-            # Fallback to form data (e.g., if client used FormData accidentally)
-            if request.form:
-                data = request.form.to_dict()
-            elif request.data:
-                try:
-                    data = json.loads(request.data.decode('utf-8'))
-                except Exception:
-                    data = None
-
         if not data:
-            print('Diagnostics called with empty/invalid payload. Headers:', dict(request.headers))
             return jsonify({"success": False, "error": "Invalid request data"}), 400
 
-        print(f"Diagnostics payload: {data}")
-        
+        project_id, project_error = _require_project(data)
+        if project_error:
+            return project_error
+
         model_name = data.get('model_name')
         patch_size = data.get('patch_size', 512)
         overlap = data.get('overlap', 64)
-        contrast_values_str = data.get('contrast_values', '0.75, 1.0, 1.5, 2.0')
-        
-        # Parse contrast values
-        contrast_values = [float(x.strip()) for x in contrast_values_str.split(",") if x.strip()]
-        
+        contrast_values_str = str(data.get('contrast_values', '0.75, 1.0, 1.5, 2.0'))
+        try:
+            contrast_values = [float(x.strip()) for x in contrast_values_str.split(",") if x.strip()]
+        except ValueError:
+            return jsonify({"success": False, "error": "Contrast values must be numbers separated by commas."}), 400
+
         # Custom model path can be resolved now (no download involved); the
         # preset-model path/prompt (which may require a download) is instead
         # resolved inside the background thread below, so that download's
@@ -920,12 +1344,20 @@ def run_diagnostics():
             custom_model_path = session.get('custom_model_path')
             if not custom_model_path or not os.path.exists(custom_model_path):
                 return jsonify({"success": False, "error": "Custom model not uploaded or not found"}), 400
+        elif model_name not in MODELS:
+            return jsonify({"success": False, "error": "Unknown model."}), 400
 
-        # Run diagnostics in a background thread and report progress via progress_queues
+        try:
+            run_dir, input_dir, entries = _stage_selection(
+                project_id, data.get('drawings'), bool(data.get('use_preprocessed', True)), limit=5)
+        except ValueError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+
         from ink import run_diagnostics as ink_run_diagnostics
 
-        diagnostics_dir = 'temp_diagnostics'
-        os.makedirs(diagnostics_dir, exist_ok=True)
+        stamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        diagnostics_dir = project_manager.area_dir(project_id, 'diagnostics') / stamp
+        diagnostics_dir.mkdir(parents=True, exist_ok=True)
 
         # Create session for progress reporting
         session_id = str(int(time.time() * 1000))
@@ -944,10 +1376,8 @@ def run_diagnostics():
                     # If the model is not present, download it here (in the
                     # background thread) so real progress can stream out.
                     if not os.path.exists(model_path):
-                        print(f"Model '{model_name}' not found at {model_path}. Attempting to download...")
                         downloaded_path, downloaded_prompt = download_model(model_name, session_id=session_id)
                         if not downloaded_path:
-                            print(f"Failed to download model: {model_name}")
                             progress_queues[session_id].put({
                                 'progress': 0,
                                 'message': 'Model not downloaded and download failed',
@@ -958,16 +1388,10 @@ def run_diagnostics():
                         if downloaded_prompt:
                             prompt = downloaded_prompt
 
-                # Notify start
-                progress_queues[session_id].put({
-                    'progress': 5,
-                    'message': 'Starting diagnostics...',
-                })
+                progress_queues[session_id].put({'progress': 5, 'message': 'Starting diagnostics...'})
 
-                # Define a progress callback that pushes updates to the queue
                 def progress_cb(update):
                     try:
-                        # Ensure keys we send are serializable
                         progress_queues[session_id].put(update)
                     except Exception:
                         pass
@@ -981,32 +1405,29 @@ def run_diagnostics():
                         target=_monitor_sdturbo_download, args=(session_id, sdturbo_stop_event), daemon=True
                     ).start()
 
-                # Run the diagnostics (this may take time) and pass the callback
                 try:
                     success = ink_run_diagnostics(
-                        input_folder=app.config['UPLOAD_FOLDER'],
+                        input_folder=str(input_dir),
                         model_path=model_path,
                         prompt=prompt,
                         patch_size=patch_size,
                         overlap=overlap,
                         contrast_values=contrast_values,
-                        output_dir=diagnostics_dir,
+                        output_dir=str(diagnostics_dir),
                         progress_callback=progress_cb
                     )
                 finally:
                     sdturbo_stop_event.set()
 
                 if success:
-                    diagnostic_files = []
-                    for file in os.listdir(diagnostics_dir):
-                        if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                            diagnostic_files.append(file)
-
+                    # paths relative to the project's diagnostics/ folder
+                    diagnostic_files = sorted(f"{stamp}/{f}" for f in os.listdir(diagnostics_dir)
+                                              if f.lower().endswith(('.png', '.jpg', '.jpeg')))
                     progress_queues[session_id].put({
                         'progress': 100,
                         'message': 'Diagnostics completed!',
                         'completed': True,
-                        'results': {'diagnostic_files': diagnostic_files}
+                        'results': {'diagnostic_files': diagnostic_files, 'output_dir': str(diagnostics_dir)}
                     })
                 else:
                     progress_queues[session_id].put({
@@ -1020,126 +1441,153 @@ def run_diagnostics():
                     'message': f'Diagnostics error: {str(e)}',
                     'error': True
                 })
+            finally:
+                shutil.rmtree(run_dir, ignore_errors=True)
 
         thread = threading.Thread(target=diagnostics_background)
         thread.daemon = True
         thread.start()
 
-        print(f"Diagnostics started. session_id={session_id}")
-
         return jsonify({"success": True, "session_id": session_id, "message": "Diagnostics started"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+def _project_stats_path(project_id, name):
+    """A statistics file saved in the project (stats/<name>.npy), or None."""
+    if not name:
+        return None
+    name = secure_filename(str(name))
+    if not name.endswith('.npy'):
+        name += '.npy'
+    path = project_manager.get_project_path(project_id) / 'stats' / name
+    return path if path.is_file() else None
+
+@app.route('/api/projects/<project_id>/stats', methods=['GET'])
+def project_stats(project_id):
+    """Statistics files available to this project: its own (stats/) and the ones shipped with the app."""
+    path = project_manager.get_project_path(project_id)
+    if path is None:
+        return jsonify({"success": False, "error": "Project not found."}), 404
+    own = sorted(p.name for p in (path / 'stats').glob('*.npy')) if (path / 'stats').is_dir() else []
+    bundled = sorted(p.name for p in Path('.').glob('*_stats.npy'))
+    return jsonify({"success": True, "project": own, "bundled": bundled})
+
+def _resolve_stats(project_id, data):
+    """The statistics a preprocessing run uses: a project file, a bundled file or an uploaded one."""
+    source = data.get('stats_source')
+    name = str(data.get('stats_name') or '')
+    if source == 'project':
+        return _project_stats_path(project_id, name)
+    if source == 'bundled' and re.fullmatch(r'[\w.-]+_stats\.npy', name) and os.path.isfile(name):
+        return Path(name)
+    return None
+
 @app.route('/api/calculate-statistics', methods=['POST'])
 def calculate_statistics():
-    """Calculate statistics from uploaded images"""
+    """Reference statistics from drawings of the project (originals), saved in its stats/ folder."""
     try:
-        save_path = request.json.get('save_path', './custom_stats.npy')
-        
-        analyzer = DatasetAnalyzer()
-        distributions = analyzer.analyze_dataset(app.config['UPLOAD_FOLDER'])
-        analyzer.save_analysis(save_path)
-        
-        # Create summary
-        summary = {
-            "images_analyzed": len(os.listdir(app.config['UPLOAD_FOLDER'])),
-            "statistics_file": save_path,
-            "distributions": {}
-        }
-        
-        for metric_name, stats in distributions.items():
-            summary["distributions"][metric_name] = {
-                "mean": float(stats['mean']),
-                "std": float(stats['std']),
-                "min": float(stats['min']),
-                "max": float(stats['max']),
-                "median": float(stats['percentiles'][2])
-            }
-        
-        return jsonify({"success": True, "summary": summary})
+        data = request.get_json(silent=True) or {}
+        project_id, project_error = _require_project(data)
+        if project_error:
+            return project_error
+        try:
+            run_dir, input_dir, entries = _stage_selection(project_id, data.get('drawings'), False)
+        except ValueError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+        try:
+            name = secure_filename(str(data.get('name') or '')) or f"stats_{datetime.now():%Y%m%d_%H%M%S}"
+            if not name.endswith('.npy'):
+                name += '.npy'
+            save_path = project_manager.get_project_path(project_id) / 'stats' / name
+
+            analyzer = DatasetAnalyzer()
+            distributions = analyzer.analyze_dataset(str(input_dir))
+            analyzer.save_analysis(str(save_path))
+
+            summary = {"images_analyzed": len(entries), "statistics_file": name, "distributions": {}}
+            for metric_name, stats in distributions.items():
+                summary["distributions"][metric_name] = {
+                    "mean": float(stats['mean']),
+                    "std": float(stats['std']),
+                    "min": float(stats['min']),
+                    "max": float(stats['max']),
+                    "median": float(stats['percentiles'][2])
+                }
+            return jsonify({"success": True, "summary": summary})
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/preprocess-images', methods=['POST'])
 def preprocess_images():
-    """Apply preprocessing adjustments to images"""
+    """Make the preprocessed version of the selected drawings (always from the original). A drawing whose
+    values are already in range gets no preprocessed version, so inking keeps using its original."""
     try:
         data = request.get_json(silent=True) or {}
-        calculate_stats = data.get('calculate_stats', False)
-        stats_file = data.get('stats_file', None)
-        output_dir = data.get('output_dir', './preprocessed_images')
+        project_id, project_error = _require_project(data)
+        if project_error:
+            return project_error
+        names = data.get('drawings')
+        if not isinstance(names, list) or not names:
+            return jsonify({"success": False, "error": "Select at least one drawing from the project."}), 400
+        library = project_manager.get_project(project_id)['drawings']
+        unknown = [n for n in names if n not in library]
+        if unknown:
+            return jsonify({"success": False, "error": f"{unknown[0]} is not in this project's library."}), 400
 
-        os.makedirs(output_dir, exist_ok=True)
+        stats_path = _resolve_stats(project_id, data)
+        if stats_path is None:
+            return jsonify({"success": False, "error": "Choose a statistics file first."}), 400
+        model_stats = DatasetAnalyzer.load_analysis(str(stats_path)).distributions
+        stats_label = stats_path.name
 
-        # Determine which statistics to use
-        model_stats = None
-
-        if calculate_stats:
-            analyzer = DatasetAnalyzer()
-            model_stats = analyzer.analyze_dataset(app.config['UPLOAD_FOLDER'])
-        elif stats_file and os.path.exists(stats_file):
-            analyzer = DatasetAnalyzer.load_analysis(stats_file)
-            model_stats = analyzer.distributions
-        else:
-            return jsonify({"success": False, "error": "No statistics provided"}), 400
-
-        # Prepare background processing with progress reporting
         session_id = str(int(time.time() * 1000))
         progress_queues[session_id] = Queue()
+        pre_dir = project_manager.area_dir(project_id, 'preprocessed')
 
         def preprocess_in_background():
+            total = len(names)
+            adjusted, unchanged, failed = [], [], []
             try:
-                files = [f for f in os.listdir(app.config['UPLOAD_FOLDER']) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.tif', '.tiff'))]
-                total = len(files)
-                processed_count = 0
-                adjusted_count = 0
-
-                if total == 0:
-                    progress_queues[session_id].put({
-                        'progress': 100,
-                        'message': 'No images to preprocess',
-                        'completed': True,
-                        'results': {'processed': 0, 'adjusted': 0, 'output_dir': output_dir}
-                    })
-                    return
-
-                for idx, filename in enumerate(files, start=1):
-                    image_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                for idx, name in enumerate(names, start=1):
                     try:
-                        image = Image.open(image_path).convert('RGB')
+                        source = project_manager.drawing_path(project_id, name, 'original')
+                        with Image.open(source) as img:
+                            image = img.convert('RGB')
                         quality_check = check_image_quality(image, model_stats)
-
                         if quality_check['recommendations']:
-                            adjusted_image = apply_recommended_adjustments(image, model_stats, verbose=False)
-                            adjusted_count += 1
+                            result = apply_recommended_adjustments(image, model_stats, verbose=False)
+                            # write next to the target and swap: a run reading the old file is not affected
+                            tmp = pre_dir / f".tmp-{uuid.uuid4().hex}{Path(name).suffix}"
+                            result.save(tmp)
+                            os.replace(tmp, pre_dir / name)
+                            project_manager.set_preprocessed(project_id, name, {
+                                'at': datetime.now().isoformat(timespec='seconds'), 'stats': stats_label,
+                                'recommendations': [str(r) for r in quality_check['recommendations']]})
+                            adjusted.append(name)
                         else:
-                            adjusted_image = image
-
-                        output_path = os.path.join(output_dir, filename)
-                        adjusted_image.save(output_path)
-                        processed_count += 1
-
-                        progress = int(processed_count / total * 100)
-                        progress_queues[session_id].put({
-                            'progress': progress,
-                            'message': f'Processed {processed_count}/{total} images',
-                            'processed': processed_count,
-                            'adjusted': adjusted_count
-                        })
+                            # already in range: drop an older preprocessed version made with other statistics
+                            if project_manager.drawing_path(project_id, name, 'preprocessed') is not None:
+                                project_manager.set_preprocessed(project_id, name, None)
+                                (pre_dir / name).unlink(missing_ok=True)
+                            unchanged.append(name)
                     except Exception as e:
-                        # send a partial error message but continue
-                        progress_queues[session_id].put({
-                            'progress': int(processed_count / max(1, total) * 100),
-                            'message': f'Error processing {filename}: {str(e)}'
-                        })
+                        failed.append({'name': name, 'error': str(e)})
+                    progress_queues[session_id].put({
+                        'progress': int(idx / total * 100),
+                        'message': f'Checked {idx}/{total} drawings',
+                        'processed': idx,
+                        'adjusted': len(adjusted)
+                    })
 
-                # Finalize
                 progress_queues[session_id].put({
                     'progress': 100,
                     'message': 'Preprocessing completed',
                     'completed': True,
-                    'results': {'processed': processed_count, 'adjusted': adjusted_count, 'output_dir': output_dir}
+                    'results': {'processed': total - len(failed), 'adjusted': len(adjusted),
+                                'adjusted_names': adjusted, 'unchanged': unchanged, 'failed': failed,
+                                'stats': stats_label}
                 })
             except Exception as e:
                 progress_queues[session_id].put({
@@ -1151,8 +1599,6 @@ def preprocess_images():
         thread = threading.Thread(target=preprocess_in_background)
         thread.daemon = True
         thread.start()
-        print(f"Preprocessing started. session_id={session_id}, output_dir={output_dir}")
-
         return jsonify({"success": True, "session_id": session_id, "message": "Preprocessing started"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -1227,48 +1673,6 @@ def select_directory():
                     "error": "No directory selected"
                 }), 400
                 
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/get-image/<folder>/<filename>')
-def get_image(folder, filename):
-    """Serve processed images"""
-    try:
-        # Get the output directory from session or use default
-        output_dir = session.get('last_output_dir', app.config['OUTPUT_FOLDER'])
-        
-        if folder == 'output':
-            image_path = os.path.join(output_dir, filename)
-        elif folder == 'input':
-            # the pencil drawings uploaded for the batch (cloud gallery shows them next to the ink)
-            image_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(filename))
-        elif folder == 'diagnostics':
-            image_path = os.path.join('temp_diagnostics', filename)
-        elif folder == 'comparisons':
-            # Check in the comparisons subfolder of the output directory
-            image_path = os.path.join(output_dir, 'comparisons', filename)
-            # If not found, try the default location
-            if not os.path.exists(image_path):
-                image_path = os.path.join(app.config['OUTPUT_FOLDER'], 'comparisons', filename)
-        else:
-            return jsonify({"error": "Invalid folder"}), 400
-        
-        if os.path.exists(image_path):
-            return send_file(image_path, mimetype='image/png')
-        else:
-            return jsonify({"error": f"Image not found: {image_path}"}), 404
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/clear-diagnostics', methods=['POST'])
-def clear_diagnostics():
-    """Clear the diagnostics folder before a new run"""
-    try:
-        diagnostics_dir = 'temp_diagnostics'
-        if os.path.exists(diagnostics_dir):
-            shutil.rmtree(diagnostics_dir)
-        os.makedirs(diagnostics_dir, exist_ok=True)
-        return jsonify({"success": True, "message": "Diagnostics folder cleared"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

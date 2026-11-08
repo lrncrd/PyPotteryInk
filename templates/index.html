@@ -11,7 +11,7 @@
     <!-- Local Offline Vendor Assets with CDN Fallback -->
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fonts/fonts.css') }}" onerror="this.onerror=null;this.href='https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap';">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ version }}&t=20260919">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ version }}&t=20261101a">
 </head>
 
 <body>
@@ -55,6 +55,10 @@
                     <h1 class="header-brand-title">PyPottery<span class="brand-accent">Ink</span> <span class="version-badge">v{{ version }}</span></h1>
                 </div>
                 <div class="header-actions">
+                    <button type="button" id="header-project-badge" class="header-project-badge" hidden
+                        title="Active project: click to manage projects">
+                        <i class="bi bi-folder2-open"></i> <span id="header-project-name"></span>
+                    </button>
                     <a href="https://lrncrd.github.io/PyPottery/pypotteryink/usage.html" target="_blank"
                         class="pixel-assistant-container" id="pixel-container" title="Need help? Read documentation & disclaimer">
                         <div class="pixel-speech-bubble" id="pixel-speech-bubble">Need help?</div>
@@ -98,7 +102,11 @@
 
         <!-- Tab Navigation -->
         <div class="tab-navigation">
-            <button class="tab-button active" data-tab="hardware-tab">
+            <button class="tab-button active" data-tab="projects-tab">
+                <i class="bi bi-folder2"></i>
+                <span class="tab-label">Projects</span>
+            </button>
+            <button class="tab-button" data-tab="hardware-tab">
                 <i class="bi bi-cpu"></i>
                 <span class="tab-label">Hardware Check</span>
             </button>
@@ -112,7 +120,7 @@
             </button>
             <button class="tab-button" data-tab="processing-tab">
                 <i class="bi bi-palette"></i>
-                <span class="tab-label">Batch Processing</span>
+                <span class="tab-label">Batch Inking</span>
             </button>
             <button class="tab-button" data-tab="cloud-tab">
                 <i class="bi bi-cloud-arrow-up"></i>
@@ -187,7 +195,7 @@
         </div>
 
         <!-- Tab 1: Hardware Check -->
-        <div class="tab-content active" id="hardware-tab">
+        <div class="tab-content" id="hardware-tab">
             <div class="panel">
                 <h2><i class="bi bi-display"></i> System Requirements Check</h2>
                 <p class="info-text">This tool requires significant computational resources. Please verify that your local hardware meets the scientific processing requirements.</p>
@@ -210,401 +218,352 @@
             </div>
         </div>
 
-        <!-- Tab 2: Preprocessing -->
-        <div class="tab-content" id="preprocessing-tab">
+        <!-- Projects: every tab below works on the drawings of the open project -->
+        <div class="tab-content active" id="projects-tab">
             <div class="panel">
-                <h2><i class="bi bi-sliders"></i> Image Preprocessing</h2>
-                <p class="info-text">Apply preprocessing to optimize images for AI processing. Upload your images and a
-                    statistics file to adjust brightness and contrast.</p>
-
-                <h3>Apply Preprocessing</h3>
-                <div class="form-group">
-                    <label>
-                        Upload Images to Preprocess:
-                        <span class="info-tooltip"
-                            data-tooltip="Upload the images you want to preprocess. The system will analyze each image and apply adjustments based on the statistics to optimize them for AI processing."><i class="bi bi-info-circle"></i></span>
-                    </label>
-                    <div class="image-upload-area" id="preprocess-upload-area">
-                        <input type="file" id="preprocess-image-upload" multiple accept="image/*"
-                            class="file-input-hidden">
-                        <div class="upload-placeholder">
-                            <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
-                            <p>Click to select images or drag &amp; drop here</p>
-                            <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                <!-- No project open: create one, or open an existing one -->
+                <div id="projects-home">
+                    <header class="tab-head">
+                        <div>
+                            <h2>Projects</h2>
+                            <p class="tab-lead">A project holds the drawings of one job, every inked result and the settings that made it. Open one to start working.</p>
                         </div>
-                        <div class="upload-preview" id="preprocess-preview" style="display: none;"></div>
-                    </div>
-                </div>
+                    </header>
 
-                <div class="form-group" id="stats-file-group">
-                    <label for="stats-file-upload">
-                        Upload Statistics File (.npy):
-                        <span class="info-tooltip"
-                            data-tooltip="Upload a .npy statistics file. You can use one of the provided statistics files (Montale, Cimino) or create your own in the Advanced section."><i class="bi bi-info-circle"></i></span>
-                    </label>
-                    <input type="file" id="stats-file-upload" accept=".npy" class="file-input">
-                </div>
-
-                <div class="form-group">
-                    <label for="preprocess-output-dir">
-                        Output Directory:
-                        <span class="info-tooltip"
-                            data-tooltip="Folder where the preprocessed images will be saved. Will be created if it doesn't exist."><i class="bi bi-info-circle"></i></span>
-                    </label>
-                    <div class="input-with-button">
-                        <input type="text" id="preprocess-output-dir" value="./preprocessed_images"
-                            class="form-control">
-                        <button type="button" id="browse-preprocess-dir" class="btn btn-secondary btn-small">
-                            <i class="bi bi-folder2-open"></i> Browse...
+                    <div class="project-create">
+                        <div class="form-group">
+                            <label for="project-name-input">New project</label>
+                            <input type="text" id="project-name-input" class="form-control" maxlength="80"
+                                placeholder="Name, e.g. Tell el-Hammam 2026, sector C">
+                        </div>
+                        <div class="form-group">
+                            <label for="project-desc-input">Description <span class="label-optional">optional</span></label>
+                            <input type="text" id="project-desc-input" class="form-control" maxlength="500">
+                        </div>
+                        <button type="button" id="project-create-btn" class="btn btn-primary">
+                            <i class="bi bi-folder-plus"></i> Create and open
                         </button>
                     </div>
+                    <div id="project-message" style="display: none;"></div>
+
+                    <h3 class="group-title">Your projects</h3>
+                    <div id="projects-list" class="project-list"></div>
+                    <p id="projects-empty" class="empty-note" style="display: none;">No projects yet. Create the first one above.</p>
                 </div>
 
-                <button id="preprocess-btn" class="btn btn-primary" disabled>
-                    <i class="bi bi-stars"></i> Apply Preprocessing
-                </button>
-
-                <div id="preprocess-progress" class="progress-container" style="display: none; margin-top: 16px;">
-                    <h4>Overall Progress:</h4>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="preprocess-progress-fill"></div>
-                    </div>
-                    <p id="preprocess-status">Processing...</p>
-                </div>
-
-                <div id="preprocess-output" class="output-container" style="display: none;"></div>
-
-                <!-- Advanced Section - Collapsible -->
-                <details class="advanced-section">
-                    <summary class="advanced-toggle">
-                        <span><i class="bi bi-gear-fill"></i> Advanced: Calculate Custom Statistics</span>
-                        <i class="bi bi-chevron-right toggle-icon"></i>
-                    </summary>
-                    <div class="advanced-content">
-                        <p class="info-text">Create your own statistics file from a set of representative images. This
-                            is optional - you can use the provided statistics files instead.</p>
-
-                        <div class="form-group">
-                            <label>
-                                Upload Images for Statistics:
-                                <span class="info-tooltip"
-                                    data-tooltip="Upload a representative sample of your training images. The system will analyze their properties (brightness, contrast, etc.) to create optimal preprocessing parameters."><i class="bi bi-info-circle"></i></span>
-                            </label>
-                            <div class="image-upload-area" id="stats-upload-area">
-                                <input type="file" id="stats-image-upload" multiple accept="image/*"
-                                    class="file-input-hidden">
-                                <div class="upload-placeholder">
-                                    <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
-                                    <p>Click to select images or drag &amp; drop here</p>
-                                    <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
-                                </div>
-                                <div class="upload-preview" id="stats-preview" style="display: none;"></div>
-                            </div>
+                <!-- A project is open: its library, history and settings -->
+                <div id="project-workspace" hidden>
+                    <header class="tab-head project-head">
+                        <div>
+                            <h2 id="project-title"></h2>
+                            <p class="tab-lead" id="project-desc"></p>
+                            <p class="project-facts" id="project-facts"></p>
                         </div>
+                        <div class="tab-head-actions">
+                            <button type="button" class="btn btn-secondary btn-small" id="project-close-btn">
+                                <i class="bi bi-arrow-left"></i> All projects
+                            </button>
+                        </div>
+                    </header>
 
-                        <div class="form-group">
-                            <label for="stats-save-path">
-                                Save Statistics As:
-                                <span class="info-tooltip"
-                                    data-tooltip="Path where the calculated statistics will be saved as a .npy file. You can reuse this file later for preprocessing other images."><i class="bi bi-info-circle"></i></span>
-                            </label>
-                            <div class="input-with-button">
-                                <input type="text" id="stats-save-path" value="./custom_stats.npy" class="form-control">
-                                <button type="button" id="browse-stats-path" class="btn btn-secondary btn-small">
-                                    <i class="bi bi-folder2-open"></i> Browse...
+                    <section aria-labelledby="library-title">
+                        <div class="section-bar">
+                            <h3 class="group-title" id="library-title">Drawings</h3>
+                            <div class="section-bar-actions">
+                                <button type="button" class="btn btn-primary btn-small" id="library-add-files">
+                                    <i class="bi bi-plus-lg"></i> Add drawings
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-small" id="library-add-folder">
+                                    <i class="bi bi-folder-plus"></i> Add a folder
                                 </button>
                             </div>
                         </div>
+                        <input type="file" id="library-files-input" multiple accept=".png,.jpg,.jpeg,.tif,.tiff" hidden>
+                        <input type="file" id="library-folder-input" webkitdirectory multiple hidden>
+                        <div id="library-import-message" class="import-message" hidden></div>
+                        <div class="library-picker" id="library-manage" data-mode="manage"></div>
+                    </section>
 
-                        <button id="calculate-stats-btn" class="btn btn-secondary" disabled>
-                            <i class="bi bi-bar-chart-line"></i> Calculate Statistics
-                        </button>
-
-                        <div id="stats-output" class="output-container" style="display: none;"></div>
+                    <div class="project-columns">
+                        <section aria-labelledby="history-title">
+                            <h3 class="group-title" id="history-title">Run history</h3>
+                            <div id="project-history"></div>
+                        </section>
+                        <section aria-labelledby="settings-title">
+                            <h3 class="group-title" id="settings-title">Settings</h3>
+                            <div class="form-group">
+                                <label for="project-external-dir">
+                                    External copy
+                                    <span class="info-tooltip"
+                                        data-tooltip="A second copy of every run, in a folder of your choice (a shared drive, the excavation folder), in a sub-folder named after the settings. The project always keeps its own copy, so a missing drive never loses results."><i class="bi bi-info-circle"></i></span>
+                                </label>
+                                <div class="input-with-button">
+                                    <input type="text" id="project-external-dir" class="form-control"
+                                        placeholder="None: results stay only in the project">
+                                    <button type="button" id="project-external-browse" class="btn btn-secondary btn-small">
+                                        <i class="bi bi-folder2-open"></i> Browse
+                                    </button>
+                                </div>
+                                <small class="field-note" id="project-external-status"></small>
+                            </div>
+                            <div class="danger-zone">
+                                <button type="button" class="btn btn-secondary btn-small" id="project-open-folder-btn">
+                                    <i class="bi bi-folder2-open"></i> Open project folder
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-small btn-danger-quiet" id="project-delete-btn">
+                                    <i class="bi bi-trash3"></i> Delete project
+                                </button>
+                            </div>
+                        </section>
                     </div>
-                </details>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Preprocessing -->
+        <div class="tab-content" id="preprocessing-tab">
+            <div class="panel">
+                <header class="tab-head">
+                    <div>
+                        <h2>Preprocessing</h2>
+                        <p class="tab-lead">Brings brightness and contrast of the drawings close to those the models were trained on. The original is kept; inking uses the corrected version when one exists.</p>
+                    </div>
+                    <span class="project-chip" data-project-chip></span>
+                </header>
+                <div class="project-gate" data-gate></div>
+                <div class="work-grid" data-needs-project>
+                    <section class="work-main" aria-label="Drawings to preprocess">
+                        <div class="library-picker" id="preprocess-picker" data-mode="preprocess"></div>
+                    </section>
+                    <aside class="run-panel" aria-label="Preprocessing settings">
+                        <div class="form-group">
+                            <label for="stats-select">
+                                Reference statistics
+                                <span class="info-tooltip"
+                                    data-tooltip="Brightness and contrast values the drawings are compared with. Montale and Cimino come with the app; you can add your own file or calculate one from drawings that already ink well."><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <select id="stats-select" class="form-control"></select>
+                            <input type="file" id="stats-file-upload" accept=".npy" hidden>
+                        </div>
+
+                        <details class="run-advanced">
+                            <summary>Calculate statistics from the selection</summary>
+                            <div class="run-advanced-body">
+                                <p class="field-note">Use drawings that already give good results: their values become the reference for the others.</p>
+                                <div class="form-group">
+                                    <label for="stats-save-name">Save as</label>
+                                    <input type="text" id="stats-save-name" class="form-control" value="my_stats" maxlength="60">
+                                </div>
+                                <button id="calculate-stats-btn" class="btn btn-secondary btn-small" disabled>
+                                    <i class="bi bi-bar-chart-line"></i> Calculate
+                                </button>
+                                <div id="stats-output" class="run-note" style="display: none;"></div>
+                            </div>
+                        </details>
+
+                        <div class="run-footer">
+                            <p class="run-dest">Saved as the preprocessed version of each drawing, inside the project.</p>
+                            <button id="preprocess-btn" class="btn btn-run" disabled>
+                                <i class="bi bi-stars"></i> <span class="btn-run-label">Preprocess</span>
+                            </button>
+                            <small class="run-hint" id="preprocess-hint"></small>
+                        </div>
+                    </aside>
+                </div>
+                <section class="run-results" data-needs-project>
+                    <div id="preprocess-progress" class="progress-container" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="preprocess-progress-fill"></div>
+                        </div>
+                        <p id="preprocess-status">Processing...</p>
+                    </div>
+                    <div id="preprocess-output" class="output-container" style="display: none;"></div>
+                </section>
             </div>
         </div>
 
         <!-- Tab 3: Model Diagnostics -->
         <div class="tab-content" id="diagnostics-tab">
             <div class="panel">
-                <h2><i class="bi bi-search"></i> Pre-Processing Analysis</h2>
-                <p class="info-text">Run preliminary tests to visualize patch processing and contrast comparisons before full processing.</p>
-
-                <!-- Section 1: Model & Test Images -->
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <h3 class="form-section-title"><i class="bi bi-cpu"></i> 1. Model &amp; Sample Drawings</h3>
+                <header class="tab-head">
+                    <div>
+                        <h2>Model diagnostics</h2>
+                        <p class="tab-lead">Try a model on up to five drawings: see how they are cut into patches and how contrast changes the result, before inking the whole set.</p>
                     </div>
+                    <span class="project-chip" data-project-chip></span>
+                </header>
+                <div class="project-gate" data-gate></div>
+                <div class="work-grid" data-needs-project>
+                    <section class="work-main" aria-label="Drawings to test">
+                        <div class="library-picker" id="diag-picker" data-mode="diag"></div>
+                    </section>
+                    <aside class="run-panel" aria-label="Diagnostics settings">
+                        <div class="form-group">
+                            <label for="diag-model-select">
+                                Model
+                                <span class="info-tooltip"
+                                    data-tooltip="Choose the AI model optimized for your pottery type. Each model is trained on different archaeological periods and styles."><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <select id="diag-model-select" class="form-control model-select" aria-describedby="diag-model-desc">
+                                {% for name, info in models.items() %}
+                                <option value="{{ name }}" data-desc="{{ info.description }}">{{ name }}</option>
+                                {% endfor %}
+                                <option value="custom" data-desc="A .pkl model file from your computer.">Custom model…</option>
+                            </select>
+                            <small class="field-note model-desc" id="diag-model-desc"></small>
+                        </div>
+                        <div class="form-group" id="diag-custom-model-upload" style="display: none;">
+                            <label for="diag-custom-model-file">Custom model (.pkl)</label>
+                            <input type="file" id="diag-custom-model-file" accept=".pkl" class="file-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="diag-contrast">
+                                Contrast values to compare
+                                <span class="info-tooltip"
+                                    data-tooltip="Comma-separated contrast values to test. The model will generate outputs for each value so you can compare results. Example: 0.75, 1.0, 1.5, 2.0"><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <input type="text" id="diag-contrast" value="0.75, 1.0, 1.5, 2.0" class="form-control">
+                        </div>
 
-                    <div class="form-group">
-                        <label for="diag-model-select">
-                            Select Model:
-                            <span class="info-tooltip"
-                                data-tooltip="Choose the AI model optimized for your pottery type. Each model is trained on different archaeological periods and styles."><i class="bi bi-info-circle"></i></span>
-                        </label>
-                        <select id="diag-model-select" class="form-control">
-                            {% for name, info in models.items() %}
-                            <option value="{{ name }}">{{ name }} ({{ info.size }}) - {{ info.description }}</option>
-                            {% endfor %}
-                            <option value="custom">Custom Model (Local File)...</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group" id="diag-custom-model-upload" style="display: none;">
-                        <label for="diag-custom-model-file">
-                            Upload Custom Model (.pkl):
-                            <span class="info-tooltip"
-                                data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture."><i class="bi bi-info-circle"></i></span>
-                        </label>
-                        <input type="file" id="diag-custom-model-file" accept=".pkl" class="file-input">
-                        <small style="display: block; margin-top: 5px; color: var(--text-muted);">
-                            Select a local .pkl model file
-                        </small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            Upload Sample Images (Max 5):
-                            <span class="info-tooltip"
-                                data-tooltip="Upload pottery drawings to run diagnostic tests. The system will show you how different parameters affect the output."><i class="bi bi-info-circle"></i></span>
-                        </label>
-                        <div class="image-upload-area" id="diag-upload-area">
-                            <input type="file" id="diag-image-upload" multiple accept="image/*" class="file-input-hidden">
-                            <div class="upload-placeholder">
-                                <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
-                                <p>Click to select images or drag &amp; drop here</p>
-                                <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                        <details class="run-advanced">
+                            <summary>Patches</summary>
+                            <div class="run-advanced-body field-pair">
+                                <div class="form-group">
+                                    <label for="diag-patch-size">Patch size</label>
+                                    <input type="number" id="diag-patch-size" value="512" min="256" max="1024" step="64" class="form-control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="diag-overlap">Overlap</label>
+                                    <input type="number" id="diag-overlap" value="64" min="0" max="256" step="16" class="form-control">
+                                </div>
                             </div>
-                            <div class="upload-preview" id="diag-preview" style="display: none;"></div>
-                        </div>
-                    </div>
-                </div>
+                        </details>
 
-                <!-- Section 2: Parameters -->
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <h3 class="form-section-title"><i class="bi bi-sliders"></i> 2. Diagnostic Parameters</h3>
-                    </div>
-
-                    <div class="form-grid-params">
-                        <div class="form-group">
-                            <label for="diag-patch-size">
-                                Patch Size:
-                                <span class="info-tooltip"
-                                    data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512"><i class="bi bi-info-circle"></i></span>
-                            </label>
-                            <input type="number" id="diag-patch-size" value="512" min="256" max="1024" step="64"
-                                class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="diag-overlap">
-                                Overlap:
-                                <span class="info-tooltip"
-                                    data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64"><i class="bi bi-info-circle"></i></span>
-                            </label>
-                            <input type="number" id="diag-overlap" value="64" min="0" max="256" step="16"
-                                class="form-control">
-                        </div>
-                    </div>
-
-                    <div class="form-group" style="margin-top: 14px;">
-                        <label for="diag-contrast">
-                            Contrast Test Values:
-                            <span class="info-tooltip"
-                                data-tooltip="Comma-separated contrast values to test. The model will generate outputs for each value so you can compare results. Example: 0.75, 1.0, 1.5, 2.0"><i class="bi bi-info-circle"></i></span>
+                        <label class="switch-row">
+                            <input type="checkbox" id="diag-use-pre" checked>
+                            <span>Use the preprocessed version when there is one</span>
                         </label>
-                        <input type="text" id="diag-contrast" value="0.75, 1.0, 1.5, 2.0" class="form-control">
-                        <small>Comma-separated values for contrast comparison</small>
-                    </div>
+
+                        <div class="run-footer">
+                            <p class="run-dest">Saved in the project, under diagnostics.</p>
+                            <button id="run-diagnostics-btn" class="btn btn-run" disabled>
+                                <i class="bi bi-play-circle-fill"></i> <span class="btn-run-label">Run diagnostics</span>
+                            </button>
+                            <small class="run-hint" id="diag-hint"></small>
+                        </div>
+                    </aside>
                 </div>
-
-                <!-- Section 3: Execution & Visual Analysis -->
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <h3 class="form-section-title"><i class="bi bi-play-circle"></i> 3. Test Execution &amp; Results</h3>
-                    </div>
-
-                    <button id="run-diagnostics-btn" class="btn btn-primary" disabled>
-                        <i class="bi bi-play-circle-fill"></i> Run Diagnostics
-                    </button>
-
-                    <div id="diag-progress" class="progress-container" style="display: none; margin-top: 16px;">
-                        <h4>Overall Progress:</h4>
+                <section class="run-results" data-needs-project>
+                    <div id="diag-progress" class="progress-container" style="display: none;">
                         <div class="progress-bar">
                             <div class="progress-fill" id="diag-progress-fill"></div>
                         </div>
                         <p id="diag-status">Processing...</p>
                     </div>
-
                     <div id="diagnostics-output" class="output-container" style="display: none;"></div>
                     <div id="diagnostics-gallery" class="gallery" style="display: none;"></div>
-                </div>
+                </section>
             </div>
         </div>
 
         <!-- Tab 4: Batch Processing -->
         <div class="tab-content" id="processing-tab">
             <div class="panel">
-                <h2><i class="bi bi-palette"></i> Batch Image Processing</h2>
-                <p class="info-text">Process multiple pottery drawings with AI enhancement to produce publication-ready line art.</p>
-
-                <!-- Section 1: AI Model & Source Drawings -->
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <h3 class="form-section-title"><i class="bi bi-cpu"></i> 1. AI Model &amp; Source Drawings</h3>
+                <header class="tab-head">
+                    <div>
+                        <h2>Batch inking</h2>
+                        <p class="tab-lead">Ink the drawings of the project with a local model, on this computer. Nothing leaves it.</p>
                     </div>
-
-                    <div class="form-group">
-                        <label for="process-model-select">
-                            Select Model:
-                            <span class="info-tooltip"
-                                data-tooltip="Choose the AI model best suited for your pottery type. Models are specialized for different archaeological periods: Bronze Age, Protohistoric, Historic, or general-purpose."><i class="bi bi-info-circle"></i></span>
-                        </label>
-                        <select id="process-model-select" class="form-control">
-                            {% for name, info in models.items() %}
-                            <option value="{{ name }}">{{ name }} ({{ info.size }}) - {{ info.description }}</option>
-                            {% endfor %}
-                            <option value="custom">Custom Model (Local File)...</option>
-                        </select>
-                        <small class="model-status-text" id="model-status-text"
-                            style="display: block; margin-top: 5px; color: var(--text-muted);">
-                            Model will be automatically downloaded if not present
-                        </small>
-                    </div>
-
-                    <div class="form-group" id="custom-model-upload" style="display: none;">
-                        <label for="custom-model-file">
-                            Upload Custom Model (.pkl):
-                            <span class="info-tooltip"
-                                data-tooltip="Upload your own trained model file. Must be a compatible .pkl file trained with the same architecture."><i class="bi bi-info-circle"></i></span>
-                        </label>
-                        <input type="file" id="custom-model-file" accept=".pkl" class="file-input">
-                        <small style="display: block; margin-top: 5px; color: var(--text-muted);">
-                            Select a local .pkl model file
-                        </small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            Upload Pottery Drawings:
-                            <span class="info-tooltip"
-                                data-tooltip="Upload pottery drawings to enhance with AI. All images will be processed in batch. Supports PNG, JPG, and JPEG formats."><i class="bi bi-info-circle"></i></span>
-                        </label>
-                        <div class="image-upload-area" id="process-upload-area">
-                            <input type="file" id="process-image-upload" multiple accept="image/*"
-                                class="file-input-hidden">
-                            <div class="upload-placeholder">
-                                <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
-                                <p>Click to select images or drag &amp; drop here</p>
-                                <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
-                            </div>
-                            <div class="upload-preview" id="process-preview" style="display: none;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Section 2: Reconstruction Parameters -->
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <h3 class="form-section-title"><i class="bi bi-sliders"></i> 2. Reconstruction Parameters</h3>
-                    </div>
-
-                    <div class="form-grid-params">
+                    <span class="project-chip" data-project-chip></span>
+                </header>
+                <div class="project-gate" data-gate></div>
+                <div class="work-grid" data-needs-project>
+                    <section class="work-main" aria-label="Drawings to ink">
+                        <div class="library-picker" id="process-picker" data-mode="local"></div>
+                    </section>
+                    <aside class="run-panel" aria-label="Inking settings">
                         <div class="form-group">
-                            <label for="process-patch-size">
-                                Patch Size:
+                            <label for="process-model-select">
+                                Model
                                 <span class="info-tooltip"
-                                    data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512"><i class="bi bi-info-circle"></i></span>
+                                    data-tooltip="Choose the AI model best suited for your pottery type. Models are specialized for different archaeological periods: Bronze Age, Protohistoric, Historic, or general-purpose."><i class="bi bi-info-circle"></i></span>
                             </label>
-                            <input type="number" id="process-patch-size" value="512" min="256" max="1024" step="64"
-                                class="form-control">
+                            <select id="process-model-select" class="form-control model-select" aria-describedby="process-model-desc model-status-text">
+                                {% for name, info in models.items() %}
+                                <option value="{{ name }}" data-desc="{{ info.description }}">{{ name }}</option>
+                                {% endfor %}
+                                <option value="custom" data-desc="A .pkl model file from your computer.">Custom model…</option>
+                            </select>
+                            <small class="field-note model-desc" id="process-model-desc"></small>
+                            <small class="field-note" id="model-status-text">Downloaded automatically the first time.</small>
                         </div>
-                        <div class="form-group">
-                            <label for="process-overlap">
-                                Overlap:
-                                <span class="info-tooltip"
-                                    data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64"><i class="bi bi-info-circle"></i></span>
-                            </label>
-                            <input type="number" id="process-overlap" value="64" min="0" max="256" step="16"
-                                class="form-control">
+                        <div class="form-group" id="custom-model-upload" style="display: none;">
+                            <label for="custom-model-file">Custom model (.pkl)</label>
+                            <input type="file" id="custom-model-file" accept=".pkl" class="file-input">
                         </div>
                         <div class="form-group">
                             <label for="process-contrast">
-                                Contrast Scale:
+                                Contrast
                                 <span class="info-tooltip"
                                     data-tooltip="Adjusts input image contrast before AI processing. >1 increases contrast, <1 decreases. Recommended: 1.0"><i class="bi bi-info-circle"></i></span>
                             </label>
-                            <input type="number" id="process-contrast" value="1.0" min="0.5" max="3.0" step="0.1"
-                                class="form-control">
+                            <input type="number" id="process-contrast" value="1.0" min="0.5" max="3.0" step="0.1" class="form-control">
                         </div>
-                        <div class="form-group">
-                            <label for="process-upscale">
-                                Scale Factor:
-                                <span class="info-tooltip"
-                                    data-tooltip="Scales images before processing. Values > 1 upscale (better quality but slower), values < 1 downscale (faster). Use 1 for original size. Range: 0.25-4"><i class="bi bi-info-circle"></i></span>
-                            </label>
-                            <input type="number" id="process-upscale" value="1" min="0.25" max="4" step="0.25"
-                                class="form-control">
-                        </div>
-                    </div>
 
-                    <div class="form-checkbox-card">
-                        <label>
-                            <input type="checkbox" id="use-fp16">
-                            <span>Use FP16 (Half Precision &mdash; Recommended for NVIDIA CUDA GPUs)</span>
-                            <span class="info-tooltip"
-                                data-tooltip="Uses 16-bit precision for faster processing on CUDA GPUs. Reduces VRAM usage but may affect quality slightly. Only works on NVIDIA GPUs."><i class="bi bi-info-circle"></i></span>
+                        <details class="run-advanced">
+                            <summary>Patches, scale and precision</summary>
+                            <div class="run-advanced-body">
+                                <div class="field-pair">
+                                    <div class="form-group">
+                                        <label for="process-patch-size">
+                                            Patch size
+                                            <span class="info-tooltip"
+                                                data-tooltip="Size of image patches for processing. Larger patches = slower but more context. Recommended: 512"><i class="bi bi-info-circle"></i></span>
+                                        </label>
+                                        <input type="number" id="process-patch-size" value="512" min="256" max="1024" step="64" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="process-overlap">
+                                            Overlap
+                                            <span class="info-tooltip"
+                                                data-tooltip="Overlap between patches to avoid seam artifacts. Higher = smoother transitions. Recommended: 64"><i class="bi bi-info-circle"></i></span>
+                                        </label>
+                                        <input type="number" id="process-overlap" value="64" min="0" max="256" step="16" class="form-control">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="process-upscale">
+                                        Scale factor
+                                        <span class="info-tooltip"
+                                            data-tooltip="Scales images before processing. Values > 1 upscale (better quality but slower), values < 1 downscale (faster). Use 1 for original size. Range: 0.25-4"><i class="bi bi-info-circle"></i></span>
+                                    </label>
+                                    <input type="number" id="process-upscale" value="1" min="0.25" max="4" step="0.25" class="form-control">
+                                </div>
+                                <label class="switch-row">
+                                    <input type="checkbox" id="use-fp16">
+                                    <span>FP16 half precision (NVIDIA GPUs only)</span>
+                                </label>
+                            </div>
+                        </details>
+
+                        <label class="switch-row">
+                            <input type="checkbox" id="process-use-pre" checked>
+                            <span>Use the preprocessed version when there is one</span>
                         </label>
-                    </div>
-                </div>
 
-                <!-- Section 3: Output & Processing -->
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <h3 class="form-section-title"><i class="bi bi-folder-check"></i> 3. Output Destination &amp; Execution</h3>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="process-output-dir">
-                            Output Directory:
-                            <span class="info-tooltip"
-                                data-tooltip="Specify the folder where processed images will be saved. Can be an absolute path or relative to the application folder."><i class="bi bi-info-circle"></i></span>
-                        </label>
-                        <div class="input-with-button">
-                            <input type="text" id="process-output-dir" value="./enhanced_pottery" class="form-control"
-                                placeholder="Enter output folder path">
-                            <button type="button" id="browse-output-dir" class="btn btn-secondary btn-small">
-                                <i class="bi bi-folder2-open"></i> Browse...
+                        <div class="run-footer">
+                            <p class="run-dest" id="process-dest"></p>
+                            <button id="process-images-btn" class="btn btn-run" disabled>
+                                <i class="bi bi-play-circle-fill"></i> <span class="btn-run-label">Ink drawings</span>
                             </button>
+                            <small class="run-hint" id="process-hint"></small>
                         </div>
-                        <small style="display: block; margin-top: 5px; color: var(--text-muted);">
-                            Specify where to save the processed images or click Browse to select a folder
-                        </small>
-                    </div>
-
-                    <button id="process-images-btn" class="btn btn-success btn-large" disabled style="width: 100%; margin-top: 8px;">
-                        <i class="bi bi-play-circle-fill"></i> Start Processing
-                    </button>
-
-                    <div id="process-progress" class="progress-container" style="display: none;">
-                        <h4>Overall Progress:</h4>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="process-progress-fill"></div>
-                        </div>
-                        <p id="process-status">Processing...</p>
-
-                        <h4 style="margin-top: 20px;">Current Image Patches:</h4>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="patch-progress-fill"></div>
-                        </div>
-                        <p id="patch-status">Waiting...</p>
-                    </div>
-
-                    <div id="process-output" class="output-container" style="display: none;"></div>
-                    <div id="process-gallery" class="gallery" style="display: none;"></div>
+                    </aside>
                 </div>
+                <section class="run-results" data-needs-project>
+                    <div id="process-output" class="output-container" style="display: none;"></div>
+                    <div id="process-gallery" style="display: none;"></div>
+                </section>
             </div>
         </div>
 
@@ -615,67 +574,63 @@
              data-model-notes='{ {% for m in cloud.models %}{{ m.id|tojson }}: {{ m.note|tojson }}{% if not loop.last %}, {% endif %}{% endfor %} }'
              data-max-variants="{{ cloud.max_variants }}">
             <div class="panel">
-                <h2><i class="bi bi-cloud-arrow-up"></i> Cloud Inking <span class="beta-chip">beta</span></h2>
-                <p class="info-text">Ink pencil drawings with a general-purpose image model instead of the local one. No GPU and no model download are needed; you pay per image.</p>
-
-                <!-- Section 1: Privacy and connection -->
-                <div class="form-section cloud-gate">
-                    <div class="form-section-header">
-                        <h3 class="form-section-title"><i class="bi bi-shield-exclamation"></i> Before you start</h3>
+                <header class="tab-head">
+                    <div>
+                        <h2>Cloud inking <span class="beta-chip">beta</span></h2>
+                        <p class="tab-lead">Ink with a general-purpose image model through OpenRouter. No GPU and no download; you pay per image.</p>
                     </div>
+                    <span class="project-chip" data-project-chip></span>
+                </header>
+                <div class="project-gate" data-gate></div>
 
-                    <div class="cloud-privacy" role="note">
-                        <i class="bi bi-exclamation-triangle-fill"></i>
-                        <p><strong>Your drawings leave this computer.</strong> Each image is sent to OpenRouter and to the company that runs the model. Do not use this mode for unpublished material you are not allowed to share. The local workflow in the other tabs stays fully offline.</p>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="cloud-api-key">
-                            OpenRouter API key:
-                            <span class="info-tooltip"
-                                data-tooltip="The key is kept in memory for this session only. It is never saved to disk or logged, and it disappears when you close or reload the page."><i class="bi bi-info-circle"></i></span>
-                        </label>
-                        <div class="input-with-button">
-                            <input type="password" id="cloud-api-key" class="form-control" autocomplete="off"
-                                spellcheck="false" placeholder="sk-or-v1-...">
-                            <a href="{{ cloud.keys_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-small">
-                                <i class="bi bi-box-arrow-up-right"></i> Get a key
-                            </a>
-                        </div>
-                        <small class="cloud-hint">Kept in memory for this session only. Closing or reloading the page forgets it.</small>
-                    </div>
-
-                    <div class="form-checkbox-card">
-                        <label>
-                            <input type="checkbox" id="cloud-consent">
-                            <span>I understand that the drawings I process are sent to external providers.</span>
-                        </label>
-                    </div>
+                <div class="cloud-privacy" role="note" data-needs-project>
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <p><strong>Your drawings leave this computer.</strong> Each image is sent to OpenRouter and to the company that runs the model. Do not use this mode for unpublished material you are not allowed to share. The local workflow in the other tabs stays fully offline.</p>
                 </div>
 
-                <!-- Section 2: Model and style -->
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <h3 class="form-section-title"><i class="bi bi-brush"></i> Model &amp; stippling style</h3>
-                    </div>
-
-                    <div class="form-group">
-                        <span class="cloud-label" id="cloud-style-label">Stippling style:</span>
-                        <div class="cloud-style-cards" role="radiogroup" aria-labelledby="cloud-style-label">
-                            {% for st in cloud.styles %}
-                            <label class="cloud-style-card">
-                                <input type="radio" name="cloud-style" value="{{ st.id }}" {% if loop.first %}checked{% endif %}>
-                                <span class="cloud-style-name">{{ st.label }}</span>
-                                <span class="cloud-style-desc">{{ st.description }}</span>
+                <div class="work-grid" data-needs-project>
+                    <section class="work-main" aria-label="Drawings to ink">
+                        <div class="library-picker" id="cloud-picker" data-mode="cloud"></div>
+                    </section>
+                    <aside class="run-panel" aria-label="Cloud inking settings">
+                        <div class="cloud-connection" id="cloud-connection">
+                            <div class="form-group">
+                                <label for="cloud-api-key">
+                                    OpenRouter API key
+                                    <span class="info-tooltip"
+                                        data-tooltip="The key is kept in memory for this session only. It is never saved to disk or logged, and it disappears when you close or reload the page."><i class="bi bi-info-circle"></i></span>
+                                </label>
+                                <div class="input-with-button">
+                                    <input type="password" id="cloud-api-key" class="form-control" autocomplete="off"
+                                        spellcheck="false" placeholder="sk-or-v1-...">
+                                    <a href="{{ cloud.keys_url }}" target="_blank" rel="noopener" class="btn btn-secondary btn-small">
+                                        <i class="bi bi-box-arrow-up-right"></i> Get a key
+                                    </a>
+                                </div>
+                                <small class="field-note">Kept in memory for this session only.</small>
+                            </div>
+                            <label class="switch-row">
+                                <input type="checkbox" id="cloud-consent">
+                                <span>I understand that the drawings I process are sent to external providers.</span>
                             </label>
-                            {% endfor %}
                         </div>
-                    </div>
 
-                    <div class="form-grid-params cloud-model-row">
+                        <div class="form-group">
+                            <span class="field-label" id="cloud-style-label">Stippling</span>
+                            <div class="cloud-style-cards" role="radiogroup" aria-labelledby="cloud-style-label">
+                                {% for st in cloud.styles %}
+                                <label class="cloud-style-card">
+                                    <input type="radio" name="cloud-style" value="{{ st.id }}" {% if loop.first %}checked{% endif %}>
+                                    <span class="cloud-style-name">{{ st.label }}</span>
+                                    <span class="cloud-style-desc">{{ st.description }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label for="cloud-model-select">
-                                Model:
+                                Model
                                 <span class="info-tooltip"
                                     data-tooltip="GPT Image 2 gave the best results in our benchmark of 14 drawings. Other models were not tested for this task and were mostly worse."><i class="bi bi-info-circle"></i></span>
                             </label>
@@ -685,127 +640,131 @@
                                 {% endfor %}
                                 <option value="custom">Other OpenRouter model...</option>
                             </select>
-                            <small class="cloud-hint" id="cloud-model-note">{{ cloud.models[0].note }}</small>
+                            <small class="field-note" id="cloud-model-note">{{ cloud.models[0].note }}</small>
                         </div>
-                        <div class="form-group">
-                            <label for="cloud-variants">
-                                Versions per drawing:
-                                <span class="info-tooltip"
-                                    data-tooltip="Every version is a separate paid call. The same drawing can come out differently each time, so a few versions let you pick the best."><i class="bi bi-info-circle"></i></span>
-                            </label>
-                            <input type="number" id="cloud-variants" value="1" min="1" max="{{ cloud.max_variants }}" step="1" class="form-control">
-                            <small class="cloud-hint">Files are saved as name_v1, name_v2...</small>
+                        <div class="form-group" id="cloud-custom-model-group" style="display: none;">
+                            <label for="cloud-custom-model">Model id</label>
+                            <input type="text" id="cloud-custom-model" class="form-control" placeholder="provider/model-name"
+                                spellcheck="false" autocomplete="off">
+                            <small class="field-note">Copy it from openrouter.ai/models. Models other than the recommended one were not tested for this task, and some do not accept an image as input.</small>
                         </div>
-                    </div>
 
-                    <div class="form-group" id="cloud-custom-model-group" style="display: none;">
-                        <label for="cloud-custom-model">Model id:</label>
-                        <input type="text" id="cloud-custom-model" class="form-control" placeholder="provider/model-name"
-                            spellcheck="false" autocomplete="off">
-                        <small class="cloud-hint">Copy it from openrouter.ai/models. Models other than the two above were not tested for this task, and some do not accept an image as input.</small>
-                    </div>
-
-                    <details class="advanced-section">
-                        <summary class="advanced-toggle">
-                            <span><i class="bi bi-chat-square-text"></i> Advanced: additional instructions</span>
-                            <i class="bi bi-chevron-right toggle-icon"></i>
-                        </summary>
-                        <div class="advanced-content">
-                            <p class="info-text">Text added after the standard prompt, for example &ldquo;the drawing has a scale bar: keep it&rdquo;. The standard prompt cannot be changed. Custom text makes results harder to reproduce.</p>
-                            <textarea id="cloud-extra-prompt" class="form-control" rows="3" maxlength="1000"
-                                placeholder="Optional"></textarea>
-                        </div>
-                    </details>
-                </div>
-
-                <!-- Section 3: Drawings -->
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <h3 class="form-section-title"><i class="bi bi-images"></i> Drawings &amp; output</h3>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            Upload Pottery Drawings:
-                            <span class="info-tooltip"
-                                data-tooltip="Pencil drawings to ink. Each output has the same size and format as its input."><i class="bi bi-info-circle"></i></span>
-                        </label>
-                        <div class="image-upload-area" id="cloud-upload-area">
-                            <input type="file" id="cloud-image-upload" multiple accept="image/*" class="file-input-hidden">
-                            <div class="upload-placeholder">
-                                <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
-                                <p>Click to select images or drag &amp; drop here</p>
-                                <small>Multiple images supported (PNG, JPG, JPEG, TIFF)</small>
+                        <details class="run-advanced">
+                            <summary>Versions, cost limit and registration</summary>
+                            <div class="run-advanced-body">
+                                <div class="field-pair">
+                                    <div class="form-group">
+                                        <label for="cloud-variants">
+                                            Versions
+                                            <span class="info-tooltip"
+                                                data-tooltip="Every version is a separate paid call. The same drawing can come out differently each time, so a few versions let you pick the best. Files are saved as name_v1, name_v2..."><i class="bi bi-info-circle"></i></span>
+                                        </label>
+                                        <input type="number" id="cloud-variants" value="1" min="1" max="{{ cloud.max_variants }}" step="1" class="form-control">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="cloud-budget">
+                                            Stop at (USD)
+                                            <span class="info-tooltip"
+                                                data-tooltip="No new image is started once the cost reaches this amount. Leave empty for no limit."><i class="bi bi-info-circle"></i></span>
+                                        </label>
+                                        <input type="number" id="cloud-budget" min="0.01" step="0.01" placeholder="No limit" class="form-control">
+                                    </div>
+                                </div>
+                                <label class="switch-row">
+                                    <input type="checkbox" id="cloud-align">
+                                    <span>Register the ink onto the pencil drawing</span>
+                                </label>
                             </div>
-                            <div class="upload-preview" id="cloud-preview" style="display: none;"></div>
-                        </div>
-                    </div>
+                        </details>
 
-                    <div class="form-group">
-                        <label for="cloud-output-dir">
-                            Output Directory:
-                            <span class="info-tooltip"
-                                data-tooltip="Folder where the inked drawings and the log are saved. Will be created if it does not exist."><i class="bi bi-info-circle"></i></span>
+                        <details class="run-advanced" id="cloud-ref-section">
+                            <summary>Reference drawing <span class="label-optional">optional</span></summary>
+                            <div class="run-advanced-body">
+                                <p class="field-note">Show the model an example of the inking style you want: it copies the line weights and the stippling, never the shapes. In our benchmark a reference did not improve GPT Image 2 on average (88% usable drawings with and without), so use it to match a particular house style and check the results. The reference is also sent to the provider.</p>
+
+                                <div class="cloud-ref-modes" role="radiogroup" aria-label="Reference type">
+                                    <label><input type="radio" name="cloud-ref-mode" value="none" checked> <span>No reference</span></label>
+                                    <label><input type="radio" name="cloud-ref-mode" value="pair"> <span>Pencil drawing and its inked version</span></label>
+                                    <label><input type="radio" name="cloud-ref-mode" value="sheet"> <span>One sheet: pencil on the left, ink on the right</span></label>
+                                    <label><input type="radio" name="cloud-ref-mode" value="style"> <span>Just one inked drawing: copy its style</span></label>
+                                </div>
+
+                                <div class="cloud-ref-slots" id="cloud-ref-slots" style="display: none;">
+                                    <div class="cloud-ref-slot" data-slot="pencil" data-mode="pair">
+                                        <label for="cloud-ref-pencil">Pencil drawing</label>
+                                        <input type="file" id="cloud-ref-pencil" accept="image/*" class="file-input">
+                                        <img class="cloud-ref-thumb" alt="" hidden>
+                                        <button type="button" class="btn btn-secondary btn-small cloud-ref-remove" hidden>
+                                            <i class="bi bi-trash3"></i> Remove
+                                        </button>
+                                    </div>
+                                    <div class="cloud-ref-slot" data-slot="ink" data-mode="pair">
+                                        <label for="cloud-ref-ink">Its inked version</label>
+                                        <input type="file" id="cloud-ref-ink" accept="image/*" class="file-input">
+                                        <img class="cloud-ref-thumb" alt="" hidden>
+                                        <button type="button" class="btn btn-secondary btn-small cloud-ref-remove" hidden>
+                                            <i class="bi bi-trash3"></i> Remove
+                                        </button>
+                                    </div>
+                                    <div class="cloud-ref-slot" data-slot="style" data-mode="style">
+                                        <label for="cloud-ref-style">Inked drawing to copy the style from</label>
+                                        <input type="file" id="cloud-ref-style" accept="image/*" class="file-input">
+                                        <img class="cloud-ref-thumb" alt="" hidden>
+                                        <button type="button" class="btn btn-secondary btn-small cloud-ref-remove" hidden>
+                                            <i class="bi bi-trash3"></i> Remove
+                                        </button>
+                                    </div>
+                                    <div class="cloud-ref-slot" data-slot="sheet" data-mode="sheet">
+                                        <label for="cloud-ref-sheet">Reference sheet</label>
+                                        <input type="file" id="cloud-ref-sheet" accept="image/*" class="file-input">
+                                        <img class="cloud-ref-thumb" alt="" hidden>
+                                        <button type="button" class="btn btn-secondary btn-small cloud-ref-remove" hidden>
+                                            <i class="bi bi-trash3"></i> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                                <small class="field-note" id="cloud-ref-hint"></small>
+                            </div>
+                        </details>
+
+                        <details class="run-advanced">
+                            <summary>Additional instructions</summary>
+                            <div class="run-advanced-body">
+                                <p class="field-note">Text added after the standard prompt, for example &ldquo;the drawing has a scale bar: keep it&rdquo;. The standard prompt cannot be changed. Custom text makes results harder to reproduce.</p>
+                                <textarea id="cloud-extra-prompt" class="form-control" rows="3" maxlength="1000"
+                                    placeholder="Optional"></textarea>
+                            </div>
+                        </details>
+
+                        <label class="switch-row">
+                            <input type="checkbox" id="cloud-use-pre" checked>
+                            <span>Use the preprocessed version when there is one</span>
                         </label>
-                        <div class="input-with-button">
-                            <input type="text" id="cloud-output-dir" value="./enhanced_pottery_cloud" class="form-control"
-                                placeholder="Enter output folder path">
-                            <button type="button" id="browse-cloud-dir" class="btn btn-secondary btn-small">
-                                <i class="bi bi-folder2-open"></i> Browse...
+
+                        <div class="run-footer">
+                            <div class="cloud-estimate" aria-live="polite">
+                                <span class="cloud-estimate-value" id="cloud-estimate-value">&mdash;</span>
+                                <span class="cloud-estimate-label" id="cloud-estimate-label">Select drawings to see an estimate</span>
+                            </div>
+                            <p class="run-dest" id="cloud-dest"></p>
+                            <button id="cloud-start-btn" class="btn btn-run" disabled>
+                                <i class="bi bi-cloud-arrow-up-fill"></i> <span class="btn-run-label">Ink in the cloud</span>
                             </button>
+                            <small class="run-hint" id="cloud-start-hint">Enter your key, accept the notice and select drawings to continue.</small>
                         </div>
-                    </div>
+                    </aside>
                 </div>
-
-                <!-- Section 4: Cost and run -->
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <h3 class="form-section-title"><i class="bi bi-coin"></i> Cost &amp; run</h3>
-                    </div>
-
-                    <div class="cloud-estimate" aria-live="polite">
-                        <div class="cloud-estimate-main">
-                            <span class="cloud-estimate-value" id="cloud-estimate-value">&mdash;</span>
-                            <span class="cloud-estimate-label" id="cloud-estimate-label">Select drawings to see an estimate</span>
-                        </div>
-                        <p class="cloud-hint">Indicative price. The real cost of every image is read from OpenRouter and shown while it runs.</p>
-                    </div>
-
-                    <div class="form-grid-params cloud-budget-row">
-                        <div class="form-group">
-                            <label for="cloud-budget">
-                                Stop at (USD):
-                                <span class="info-tooltip"
-                                    data-tooltip="No new image is started once the cost reaches this amount. Leave empty for no limit."><i class="bi bi-info-circle"></i></span>
-                            </label>
-                            <input type="number" id="cloud-budget" min="0.01" step="0.01" placeholder="No limit" class="form-control">
-                        </div>
-                    </div>
-
-                    <div class="form-checkbox-card">
-                        <label>
-                            <input type="checkbox" id="cloud-align" checked>
-                            <span>Register the ink onto the pencil drawing (recommended)</span>
-                            <span class="info-tooltip"
-                                data-tooltip="Models often shift or rescale the vessel by a few pixels. This step moves the ink back onto the pencil lines so that the two overlay."><i class="bi bi-info-circle"></i></span>
-                        </label>
-                    </div>
-
-                    <button id="cloud-start-btn" class="btn btn-success btn-large" disabled style="width: 100%; margin-top: 12px;">
-                        <i class="bi bi-play-circle-fill"></i> Start Cloud Inking
-                    </button>
-                    <small class="cloud-hint cloud-start-hint" id="cloud-start-hint">Enter your key, accept the notice and add drawings to continue.</small>
-
+                <section class="run-results" data-needs-project>
                     <div id="cloud-output" class="output-container" style="display: none;"></div>
                     <div id="cloud-gallery" class="cloud-gallery" style="display: none;"></div>
-                </div>
+                </section>
             </div>
         </div>
 
     </div>
 
     <!-- Cloud processing modal -->
-    <div id="cloud-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="cloud-modal-title">
+    <div id="cloud-modal" class="modal run-screen" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="cloud-modal-title">
         <div class="modal-content mac-window cloud-run">
             <div class="mac-titlebar">
                 <span class="mac-window-title" id="cloud-modal-title">Cloud inking</span>
@@ -852,8 +811,60 @@
                     <button type="button" class="btn btn-open-folder" id="cloud-open-folder-btn" style="display: none;">
                         <i class="bi bi-folder2-open"></i> Open Output Folder
                     </button>
-                    <button type="button" class="btn btn-primary" id="cloud-view-btn" style="display: none;">
-                        <i class="bi bi-eye"></i> View results
+                    <button type="button" class="btn btn-primary btn-view-results" id="cloud-view-btn" style="display: none;">
+                        <i class="bi bi-images"></i> View results
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Local batch: full-screen run view -->
+    <div id="local-modal" class="modal run-screen" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="local-modal-title">
+        <div class="modal-content mac-window cloud-run">
+            <div class="mac-titlebar">
+                <span class="mac-window-title" id="local-modal-title">Batch inking</span>
+                <button class="btn-close modal-close" id="local-modal-close" aria-label="Close" style="display: none;"></button>
+            </div>
+            <div class="cloud-run-body">
+                <div class="cloud-run-head">
+                    <p class="cloud-run-status" id="local-run-status" aria-live="polite">Starting...</p>
+                    <p class="cloud-run-current" id="local-run-current"></p>
+                </div>
+
+                <div class="progress-bar cloud-run-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="local-run-bar">
+                    <div class="progress-fill" id="local-run-fill"></div>
+                </div>
+                <div class="run-screen-patch">
+                    <div class="progress-bar progress-bar-thin">
+                        <div class="progress-fill" id="local-patch-fill"></div>
+                    </div>
+                    <p class="progress-sub" id="local-patch-status"></p>
+                </div>
+
+                <dl class="cloud-stats">
+                    <div class="cloud-stat">
+                        <dt>Drawings</dt>
+                        <dd id="local-stat-done">0 / 0</dd>
+                    </div>
+                    <div class="cloud-stat">
+                        <dt>Time</dt>
+                        <dd id="local-stat-time">0:00</dd>
+                        <dd class="cloud-stat-sub" id="local-stat-eta"></dd>
+                    </div>
+                </dl>
+
+                <div class="cloud-run-message" id="local-run-message" style="display: none;"></div>
+
+                <div class="cloud-run-actions">
+                    <button type="button" class="btn btn-secondary" id="local-stop-btn">
+                        <i class="bi bi-stop-circle"></i> Stop after this drawing
+                    </button>
+                    <button type="button" class="btn btn-open-folder" id="local-open-folder-btn" style="display: none;">
+                        <i class="bi bi-folder2-open"></i> Open folder
+                    </button>
+                    <button type="button" class="btn btn-primary btn-view-results" id="local-view-btn" style="display: none;">
+                        <i class="bi bi-images"></i> View results
                     </button>
                 </div>
             </div>
@@ -868,7 +879,8 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}&t=20260919"></script>
+    <script src="{{ url_for('static', filename='js/projects.js') }}?v={{ version }}&t=20261101a"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v={{ version }}&t=20261101a"></script>
 </body>
 
 </html>

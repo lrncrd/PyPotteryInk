@@ -208,3 +208,6 @@ references_md/
 references/
 INPUT/
 experiments/
+
+# Projects (run history per project; see project_manager.py)
+projects/

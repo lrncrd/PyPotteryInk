@@ -176,214 +176,173 @@ document.getElementById('check-hardware-btn').addEventListener('click', async fu
     }
 });
 
-// File Upload Handler
-function setupFileUpload(inputId, enableButtonIds) {
-    const input = document.getElementById(inputId);
-    input.addEventListener('change', function () {
-        const hasFiles = this.files.length > 0;
-        enableButtonIds.forEach(btnId => {
-            const btn = document.getElementById(btnId);
-            if (btn) btn.disabled = !hasFiles;
-        });
-    });
+// Follow a background run over Server-Sent Events. Model downloads (style .pkl or the shared sd-turbo
+// backbone) drive the download overlay; any other message means the run itself is progressing.
+function followRun(sessionId, { onProgress, onDone, onError }) {
+    const eventSource = new EventSource(`/api/progress/${sessionId}`);
+    eventSource.onmessage = function (event) {
+        const data = JSON.parse(event.data);
+        if (data.keepalive) return;
+        if (data.type === 'style_model_download' || data.type === 'sdturbo_download') {
+            showDownloadOverlay(data.type === 'sdturbo_download'
+                ? 'Downloading stabilityai/sd-turbo components. This is a one-time download (~5GB).'
+                : 'Downloading style model...');
+            updateDownloadProgress(data.progress, data.message);
+            return;
+        }
+        hideDownloadOverlay();
+        if (data.error) {
+            eventSource.close();
+            onError(data.message || 'The run stopped with an error.');
+            return;
+        }
+        if (onProgress) onProgress(data);
+        if (data.completed && data.results) {
+            eventSource.close();
+            onDone(data.results);
+        }
+    };
+    eventSource.onerror = function () {
+        eventSource.close();
+        onError('Connection to the app lost. The run may still finish in the background: its results will appear in the project.');
+    };
+    return eventSource;
 }
 
-// Setup file uploads for different tabs
-setupFileUpload('diag-image-upload', ['run-diagnostics-btn']);
-setupFileUpload('stats-image-upload', ['calculate-stats-btn']);
-setupFileUpload('preprocess-image-upload', ['preprocess-btn']);
+// Upload the custom .pkl chosen in a tab (kept server-side for the session)
+async function uploadCustomModel(inputId) {
+    const file = document.getElementById(inputId).files[0];
+    if (!file) throw new Error('Choose the custom model file (.pkl) first.');
+    const form = new FormData();
+    form.append('model', file);
+    const response = await fetch('/api/upload-custom-model', { method: 'POST', body: form });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) throw new Error(data.error || 'Custom model upload failed');
+}
 
-// Process image upload with counter
-document.getElementById('process-image-upload').addEventListener('change', function () {
-    const hasFiles = this.files.length > 0;
-    const uploadCount = document.getElementById('upload-count');
-    const processBtn = document.getElementById('process-images-btn');
+// Primary button of a work tab: its label says what will happen, the hint says what is missing
+function setRunButton(btnId, hintId, { count, verb, noun, missing, busy }) {
+    const btn = document.getElementById(btnId);
+    const hint = document.getElementById(hintId);
+    const label = btn.querySelector('.btn-run-label');
+    btn.disabled = !!busy || count === 0 || (missing && missing.length > 0);
+    if (label && !busy) label.textContent = count ? `${verb} ${count} ${noun}${count === 1 ? '' : 's'}` : `${verb} ${noun}s`;
+    if (hint) hint.textContent = busy ? '' : (count === 0 ? `Select ${noun}s from the project to continue.` :
+        (missing && missing.length ? `To continue: ${missing.join(', ')}.` : ''));
+}
 
-    if (hasFiles) {
-        uploadCount.textContent = `${this.files.length} file(s) selected`;
-        processBtn.disabled = false;
-    } else {
-        uploadCount.textContent = '';
-        processBtn.disabled = true;
+const runBusy = { local: false, diag: false, preprocess: false };
+const runCounts = { local: 0, diag: 0, preprocess: 0 };
+
+function refreshRunButtons() {
+    setRunButton('process-images-btn', 'process-hint', { count: runCounts.local, verb: 'Ink', noun: 'drawing', busy: runBusy.local });
+    setRunButton('run-diagnostics-btn', 'diag-hint', { count: runCounts.diag, verb: 'Test', noun: 'drawing', busy: runBusy.diag });
+    const stats = document.getElementById('stats-select');
+    setRunButton('preprocess-btn', 'preprocess-hint', {
+        count: runCounts.preprocess, verb: 'Preprocess', noun: 'drawing', busy: runBusy.preprocess,
+        missing: stats && stats.value ? [] : ['a statistics file']
+    });
+    document.getElementById('calculate-stats-btn').disabled = runBusy.preprocess || runCounts.preprocess === 0;
+}
+
+document.addEventListener('picker-change', e => {
+    if (e.detail.mode in runCounts) {
+        runCounts[e.detail.mode] = e.detail.count;
+        refreshRunButtons();
     }
+});
+
+// Results on screen belong to the previous project: hide them when another one opens
+document.addEventListener('project-changed', () => {
+    ['process-output', 'process-gallery', 'process-progress', 'diagnostics-output', 'diagnostics-gallery',
+        'diag-progress', 'preprocess-output', 'preprocess-progress', 'stats-output', 'cloud-output', 'cloud-gallery']
+        .forEach(id => {
+            const node = document.getElementById(id);
+            if (node) node.style.display = 'none';
+        });
+    loadStatsOptions();
 });
 
 // Diagnostics
 document.getElementById('run-diagnostics-btn').addEventListener('click', async function () {
-    const files = document.getElementById('diag-image-upload').files;
+    const drawings = PyProjects.selected('diag');
     const modelName = document.getElementById('diag-model-select').value;
-    const patchSize = document.getElementById('diag-patch-size').value;
-    const overlap = document.getElementById('diag-overlap').value;
-    const contrastValues = document.getElementById('diag-contrast').value;
-
-    // Max 5 images check
-    if (files.length > 5) {
-        alert('Maximum 5 images allowed for diagnostics. Please select fewer images.');
-        return;
-    }
-
-    const btn = this;
     const outputContainer = document.getElementById('diagnostics-output');
     const gallery = document.getElementById('diagnostics-gallery');
+    const progressContainer = document.getElementById('diag-progress');
+    const progressFill = document.getElementById('diag-progress-fill');
+    const statusText = document.getElementById('diag-status');
+    const btn = this;
 
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading"></span> Running...';
+    const finish = () => {
+        runBusy.diag = false;
+        btn.querySelector('.btn-run-label').textContent = '';
+        refreshRunButtons();
+    };
+    runBusy.diag = true;
+    refreshRunButtons();
+    btn.querySelector('.btn-run-label').textContent = 'Running…';
     outputContainer.style.display = 'none';
     gallery.style.display = 'none';
     gallery.innerHTML = '';
 
     try {
-        // Clear diagnostics folder first
-        await fetch('/api/clear-diagnostics', { method: 'POST' });
+        if (modelName === 'custom') await uploadCustomModel('diag-custom-model-file');
 
-        // Upload images
-        const formData = new FormData();
-        Array.from(files).forEach(file => formData.append('files', file));
-
-        const uploadResponse = await fetch('/api/upload-images', {
-            method: 'POST',
-            body: formData
-        });
-
-        if (!uploadResponse.ok) throw new Error('Upload failed');
-
-        // Handle custom model upload if selected
-        if (modelName === 'custom') {
-            const customModelFile = document.getElementById('diag-custom-model-file').files[0];
-            if (!customModelFile) {
-                throw new Error('Please select a custom model file');
-            }
-
-            const modelFormData = new FormData();
-            modelFormData.append('model', customModelFile);
-
-            const modelUploadResponse = await fetch('/api/upload-custom-model', {
-                method: 'POST',
-                body: modelFormData
-            });
-
-            if (!modelUploadResponse.ok) {
-                const error = await modelUploadResponse.json();
-                throw new Error(error.error || 'Custom model upload failed');
-            }
-        }
-
-        // Check if diffusion model (sd-turbo) is cached
-        const diffusionCheckResponse = await fetch('/api/check-diffusion-model');
-        const diffusionCheck = await diffusionCheckResponse.json();
-
-        // If sd-turbo is not cached, show download overlay
+        const diffusionCheck = await (await fetch('/api/check-diffusion-model')).json();
         if (!diffusionCheck.cached) {
             showDownloadOverlay('Downloading stabilityai/sd-turbo components. This is a one-time download (~5GB).');
         }
 
-        // Start diagnostics (server will run in background and return a session_id)
-        const diagResponse = await fetch('/api/diagnostics', {
+        const response = await fetch('/api/diagnostics', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                project_id: PyProjects.currentId(),
+                drawings,
+                use_preprocessed: document.getElementById('diag-use-pre').checked,
                 model_name: modelName,
-                patch_size: parseInt(patchSize),
-                overlap: parseInt(overlap),
-                contrast_values: contrastValues
+                patch_size: parseInt(document.getElementById('diag-patch-size').value),
+                overlap: parseInt(document.getElementById('diag-overlap').value),
+                contrast_values: document.getElementById('diag-contrast').value
             })
         });
-
-        if (!diagResponse.ok) throw new Error('Failed to start diagnostics');
-
-        const resp = await diagResponse.json();
-        console.log('Diagnostics start response:', resp);
-
-        // Backwards-compatible: if server returned results directly
-        if (resp.success && resp.diagnostic_files) {
-            showDiagnosticsComplete(resp.diagnostic_files, outputContainer, gallery);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Run Diagnostics';
-            return;
-        }
-
-        if (!resp.success || !resp.session_id) {
-            throw new Error(resp.error || 'Failed to start diagnostics');
-        }
-
-        const sessionId = resp.session_id;
-        const progressContainer = document.getElementById('diag-progress');
-        const progressFill = document.getElementById('diag-progress-fill');
-        const statusText = document.getElementById('diag-status');
+        const resp = await response.json();
+        if (!resp.success) throw new Error(resp.error || 'Could not start the diagnostics');
 
         progressContainer.style.display = 'block';
         setProgress(progressFill, 5);
         statusText.textContent = 'Starting diagnostics...';
 
-        const eventSource = new EventSource(`/api/progress/${sessionId}`);
-
-        eventSource.onmessage = function (event) {
-            const data = JSON.parse(event.data);
-            if (data.keepalive) return;
-
-            // Model-download progress (style .pkl or the shared sd-turbo
-            // backbone) drives the overlay's real progress bar instead of
-            // the main diagnostics progress bar, and doesn't mean
-            // diagnostics has actually started yet.
-            if (data.type === 'style_model_download' || data.type === 'sdturbo_download') {
-                showDownloadOverlay(data.type === 'sdturbo_download'
-                    ? 'Downloading stabilityai/sd-turbo components. This is a one-time download (~5GB).'
-                    : 'Downloading style model...');
-                updateDownloadProgress(data.progress, data.message);
-                return;
-            }
-
-            // Any other message means real diagnostics progress has begun -
-            // hide the download overlay if it was showing.
-            hideDownloadOverlay();
-
-            if (data.error) {
-                showMessage('error', data.message || 'Diagnostics error', outputContainer);
-                eventSource.close();
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Run Diagnostics';
-                return;
-            }
-
-            if (data.progress !== undefined) {
-                const progress = Math.min(Math.max(data.progress, 0), 100);
-                setProgress(progressFill, progress);
-                statusText.textContent = data.message || 'Running diagnostics...';
-            }
-
-            if (data.completed && data.results) {
-                eventSource.close();
-
-                const files = data.results.diagnostic_files || [];
-                showDiagnosticsComplete(files, outputContainer, gallery);
-
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Run Diagnostics';
+        followRun(resp.session_id, {
+            onProgress(data) {
+                if (data.progress !== undefined) setProgress(progressFill, data.progress);
+                if (data.message) statusText.textContent = data.message;
+            },
+            onDone(results) {
                 setProgress(progressFill, 100);
                 statusText.textContent = 'Completed';
+                showDiagnosticsComplete(results, outputContainer, gallery);
+                finish();
+            },
+            onError(message) {
+                showMessage('error', escapeHtml(message), outputContainer);
+                progressContainer.style.display = 'none';
+                finish();
             }
-        };
-
-        eventSource.onerror = function () {
-            eventSource.close();
-            showMessage('error', 'Connection lost. Diagnostics may still continue in background.', outputContainer);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Run Diagnostics';
-            progressContainer.style.display = 'none';
-        };
+        });
     } catch (error) {
-        showMessage('error', 'Error: ' + error.message, outputContainer);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Run Diagnostics';
+        hideDownloadOverlay();
+        showMessage('error', escapeHtml(error.message), outputContainer);
+        finish();
     }
 });
 
-// Helper function to show diagnostics complete with open folder button
-function showDiagnosticsComplete(files, outputContainer, gallery) {
-    let html = `<div class="message message-success"><i class="bi bi-check-circle-fill"></i> Diagnostics completed! Generated ${files.length} visualizations.</div>`;
-    html += `<button class="btn btn-open-folder" onclick="openDiagnosticsFolder()"><i class="bi bi-folder2-open"></i> Open Diagnostics Folder</button>`;
-    outputContainer.innerHTML = html;
+function showDiagnosticsComplete(results, outputContainer, gallery) {
+    const files = results.diagnostic_files || [];
+    lastDiagnosticsDir = results.output_dir;
+    outputContainer.innerHTML = `<div class="message message-success"><i class="bi bi-check-circle-fill"></i> <span>${files.length} diagnostic images, saved in the project.</span></div>
+        <button class="btn btn-open-folder" type="button" onclick="openDiagnosticsFolder()"><i class="bi bi-folder2-open"></i> Open folder</button>`;
     outputContainer.style.display = 'block';
 
     gallery.innerHTML = '';
@@ -391,8 +350,8 @@ function showDiagnosticsComplete(files, outputContainer, gallery) {
         const img = document.createElement('img');
         img.loading = 'lazy';
         img.decoding = 'async';
-        img.src = `/api/get-image/diagnostics/${file}`;
-        img.alt = file;
+        img.src = PyProjects.fileUrl('diagnostics', file);
+        img.alt = file.split('/').pop();
         img.onclick = function () { openLightbox(this.src); };
         gallery.appendChild(img);
     });
@@ -412,12 +371,12 @@ async function openFolder(folderPath) {
     }
 }
 
-// Open diagnostics folder
+// Folders of the last runs (kept in variables: a Windows path does not survive an inline onclick)
+let lastDiagnosticsDir = null;
 function openDiagnosticsFolder() {
-    return openFolder('temp_diagnostics');
+    if (lastDiagnosticsDir) return openFolder(lastDiagnosticsDir);
 }
 
-// Open the output folder of the last batch run (kept in a variable: a Windows path does not survive an inline onclick)
 let lastBatchOutputDir = null;
 function openBatchOutputFolder() {
     if (lastBatchOutputDir) return openFolder(lastBatchOutputDir);
@@ -461,471 +420,421 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
-// Calculate Statistics
-document.getElementById('calculate-stats-btn').addEventListener('click', async function () {
-    const files = document.getElementById('stats-image-upload').files;
-    const savePath = document.getElementById('stats-save-path').value;
+// Statistics files offered by Preprocessing: the project's own, the ones shipped with the app, or a new .npy
+async function loadStatsOptions(selectName) {
+    const select = document.getElementById('stats-select');
+    const projectId = PyProjects.currentId();
+    const previous = selectName || select.value;
+    select.replaceChildren();
+    const placeholder = new Option('Choose statistics…', '');
+    select.appendChild(placeholder);
+    if (projectId) {
+        try {
+            const data = await (await fetch(`/api/projects/${encodeURIComponent(projectId)}/stats`)).json();
+            const addGroup = (label, source, names) => {
+                if (!names || !names.length) return;
+                const group = document.createElement('optgroup');
+                group.label = label;
+                names.forEach(n => group.appendChild(new Option(n.replace(/\.npy$/, '').replace(/_stats$/, '').replace(/_/g, ' '), `${source}:${n}`)));
+                select.appendChild(group);
+            };
+            addGroup('This project', 'project', data.project);
+            addGroup('Shipped with the app', 'bundled', data.bundled);
+        } catch (e) { /* the upload option below still works */ }
+    }
+    select.appendChild(new Option('Add a statistics file (.npy)…', 'upload'));
+    const values = Array.from(select.options).map(o => o.value);
+    select.value = previous && previous !== 'upload' && values.includes(previous) ? previous : (values.find(v => v.startsWith('bundled:')) || '');
+    refreshRunButtons();
+}
 
+document.addEventListener('stats-refresh', () => loadStatsOptions());
+
+document.getElementById('stats-select').addEventListener('change', function () {
+    if (this.value === 'upload') {
+        this.value = '';
+        document.getElementById('stats-file-upload').click();
+    }
+    refreshRunButtons();
+});
+
+document.getElementById('stats-file-upload').addEventListener('change', async function () {
+    const file = this.files[0];
+    this.value = '';
+    if (!file) return;
+    const output = document.getElementById('preprocess-output');
+    try {
+        const form = new FormData();
+        form.append('stats_file', file);
+        form.append('project_id', PyProjects.currentId());
+        const response = await fetch('/api/upload-stats', { method: 'POST', body: form });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Statistics file upload failed');
+        await loadStatsOptions(`project:${data.stats_name}`);
+    } catch (error) {
+        showMessage('error', escapeHtml(error.message), output);
+    }
+});
+
+// Calculate Statistics from the drawings selected in Preprocessing
+document.getElementById('calculate-stats-btn').addEventListener('click', async function () {
     const btn = this;
     const outputContainer = document.getElementById('stats-output');
-
     btn.disabled = true;
     btn.innerHTML = '<span class="loading"></span> Calculating...';
     outputContainer.style.display = 'none';
 
     try {
-        // Upload images
-        const formData = new FormData();
-        Array.from(files).forEach(file => formData.append('files', file));
-
-        const uploadResponse = await fetch('/api/upload-images', {
-            method: 'POST',
-            body: formData
-        });
-
-        if (!uploadResponse.ok) throw new Error('Upload failed');
-
-        // Calculate statistics
-        const statsResponse = await fetch('/api/calculate-statistics', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ save_path: savePath })
-        });
-
-        const data = await statsResponse.json();
-
-        if (data.success) {
-            let html = '<div class="message message-success"><i class="bi bi-check-circle-fill"></i> Statistics calculated successfully!</div>';
-            html += `<p><strong>Images analyzed:</strong> ${data.summary.images_analyzed}</p>`;
-            html += `<p><strong>Statistics file:</strong> ${data.summary.statistics_file}</p>`;
-            html += '<h4>Distributions:</h4><table style="width: 100%; border-collapse: collapse;">';
-            html += '<tr><th>Metric</th><th>Mean</th><th>Std</th><th>Min</th><th>Max</th><th>Median</th></tr>';
-
-            for (const [metric, stats] of Object.entries(data.summary.distributions)) {
-                html += `<tr>
-                    <td>${metric.replace(/_/g, ' ')}</td>
-                    <td>${stats.mean.toFixed(4)}</td>
-                    <td>${stats.std.toFixed(4)}</td>
-                    <td>${stats.min.toFixed(4)}</td>
-                    <td>${stats.max.toFixed(4)}</td>
-                    <td>${stats.median.toFixed(4)}</td>
-                </tr>`;
-            }
-            html += '</table>';
-
-            outputContainer.innerHTML = html;
-            outputContainer.style.display = 'block';
-        } else {
-            showMessage('error', 'Statistics calculation failed: ' + data.error, outputContainer);
-        }
-    } catch (error) {
-        showMessage('error', 'Error: ' + error.message, outputContainer);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-bar-chart-line"></i> Calculate Statistics';
-    }
-});
-
-// Preprocessing
-document.getElementById('preprocess-btn').addEventListener('click', async function () {
-    const files = document.getElementById('preprocess-image-upload').files;
-    // The "use calculated statistics" checkbox was removed from the page: the stats file is always required
-    const useCalculatedStats = false;
-    const outputDir = document.getElementById('preprocess-output-dir').value;
-
-    const btn = this;
-    const outputContainer = document.getElementById('preprocess-output');
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading"></span> Processing...';
-    outputContainer.style.display = 'none';
-
-    try {
-        // Upload images
-        const formData = new FormData();
-        Array.from(files).forEach(file => formData.append('files', file));
-
-        const uploadResponse = await fetch('/api/upload-images', {
-            method: 'POST',
-            body: formData
-        });
-
-        if (!uploadResponse.ok) throw new Error('Upload failed');
-
-        let statsFilePath = null;
-
-        // Handle statistics file if not using calculated stats
-        if (!useCalculatedStats) {
-            const statsFile = document.getElementById('stats-file-upload').files[0];
-            if (!statsFile) {
-                throw new Error('Please select a statistics file (.npy)');
-            }
-
-            const statsFormData = new FormData();
-            statsFormData.append('stats_file', statsFile);
-
-            const statsUploadResponse = await fetch('/api/upload-stats', {
-                method: 'POST',
-                body: statsFormData
-            });
-
-            if (!statsUploadResponse.ok) {
-                const error = await statsUploadResponse.json();
-                throw new Error(error.error || 'Statistics file upload failed');
-            }
-
-            const statsData = await statsUploadResponse.json();
-            statsFilePath = statsData.stats_path;
-        }
-
-        console.log('Starting preprocess flow: uploading images and requesting preprocessing');
-        // Start preprocessing (server runs it in background and returns a session_id)
-        const preprocessResponse = await fetch('/api/preprocess-images', {
+        const response = await fetch('/api/calculate-statistics', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                calculate_stats: useCalculatedStats,
-                stats_file: statsFilePath,
-                output_dir: outputDir
+                project_id: PyProjects.currentId(),
+                drawings: PyProjects.selected('preprocess'),
+                name: document.getElementById('stats-save-name').value.trim()
             })
         });
-
-        if (!preprocessResponse.ok) throw new Error('Failed to start preprocessing');
-
-        const respData = await preprocessResponse.json();
-        console.log('Preprocess start response:', respData);
-
-        // Backwards-compatible: if server returned final results directly, show them
-        if (respData.success && respData.processed !== undefined) {
-            console.log('Server returned direct results (no SSE).');
-            const html = `
-                <div class="message message-success"><i class="bi bi-check-circle-fill"></i> Preprocessing completed!</div>
-                <p><strong>Total processed:</strong> ${respData.processed}</p>
-                <p><strong>Images adjusted:</strong> ${respData.adjusted}</p>
-                <p><strong>No adjustments needed:</strong> ${respData.processed - respData.adjusted}</p>
-                <p><strong>Output directory:</strong> ${respData.output_dir}</p>
-            `;
-            outputContainer.innerHTML = html;
-            outputContainer.style.display = 'block';
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-stars"></i> Apply Preprocessing';
-            return;
-        }
-
-        if (!respData.success || !respData.session_id) {
-            throw new Error(respData.error || 'Failed to start preprocessing');
-        }
-
-        // Show progress UI and listen for SSE
-        const sessionId = respData.session_id;
-        const progressContainer = document.getElementById('preprocess-progress');
-        const progressFill = document.getElementById('preprocess-progress-fill');
-        const statusText = document.getElementById('preprocess-status');
-
-        progressContainer.style.display = 'block';
-        setProgress(progressFill, 5);
-        statusText.textContent = 'Starting preprocessing...';
-
-        const eventSource = new EventSource(`/api/progress/${sessionId}`);
-
-        eventSource.onmessage = function (event) {
-            const data = JSON.parse(event.data);
-
-            if (data.keepalive) return;
-
-            if (data.error) {
-                showMessage('error', data.message || 'Preprocessing error', outputContainer);
-                eventSource.close();
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-stars"></i> Apply Preprocessing';
-                return;
-            }
-
-            if (data.progress !== undefined) {
-                const progress = Math.min(Math.max(data.progress, 0), 100);
-                setProgress(progressFill, progress);
-                statusText.textContent = data.message || 'Processing...';
-            }
-
-            if (data.completed && data.results) {
-                eventSource.close();
-
-                const results = data.results;
-                const html = `
-                    <div class="message message-success"><i class="bi bi-check-circle-fill"></i> Preprocessing completed!</div>
-                    <p><strong>Total processed:</strong> ${results.processed}</p>
-                    <p><strong>Images adjusted:</strong> ${results.adjusted}</p>
-                    <p><strong>No adjustments needed:</strong> ${results.processed - results.adjusted}</p>
-                    <p><strong>Output directory:</strong> ${results.output_dir}</p>
-                `;
-
-                outputContainer.innerHTML = html;
-                outputContainer.style.display = 'block';
-
-                // Reset button
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-stars"></i> Apply Preprocessing';
-                setProgress(progressFill, 100);
-                statusText.textContent = 'Completed';
-            }
-        };
-
-        eventSource.onerror = function () {
-            eventSource.close();
-            showMessage('error', 'Connection lost. Preprocessing may still continue in background.', outputContainer);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-stars"></i> Apply Preprocessing';
-            progressContainer.style.display = 'none';
-        };
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Statistics calculation failed');
+        outputContainer.textContent = `Saved as ${data.summary.statistics_file}, from ${data.summary.images_analyzed} drawings. It is now selected above.`;
+        outputContainer.style.display = 'block';
+        await loadStatsOptions(`project:${data.summary.statistics_file}`);
     } catch (error) {
-        showMessage('error', 'Error: ' + error.message, outputContainer);
+        outputContainer.textContent = error.message;
+        outputContainer.style.display = 'block';
     } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-stars"></i> Apply Preprocessing';
+        btn.innerHTML = '<i class="bi bi-bar-chart-line"></i> Calculate';
+        refreshRunButtons();
     }
 });
 
-// Batch Processing with Real-time Progress
-document.getElementById('process-images-btn').addEventListener('click', async function () {
-    const files = document.getElementById('process-image-upload').files;
-    const modelName = document.getElementById('process-model-select').value;
-    const outputDir = document.getElementById('process-output-dir').value;
-    const patchSize = document.getElementById('process-patch-size').value;
-    const overlap = document.getElementById('process-overlap').value;
-    const contrastScale = document.getElementById('process-contrast').value;
-    const upscale = document.getElementById('process-upscale').value;
-    const useFp16 = document.getElementById('use-fp16').checked;
-
+// Preprocessing: makes the preprocessed version of each selected drawing inside the project
+document.getElementById('preprocess-btn').addEventListener('click', async function () {
     const btn = this;
-    const progressContainer = document.getElementById('process-progress');
-    const progressFill = document.getElementById('process-progress-fill');
-    const patchProgressFill = document.getElementById('patch-progress-fill');
-    const statusText = document.getElementById('process-status');
-    const patchStatusText = document.getElementById('patch-status');
-    const outputContainer = document.getElementById('process-output');
-    const gallery = document.getElementById('process-gallery');
+    const outputContainer = document.getElementById('preprocess-output');
+    const progressContainer = document.getElementById('preprocess-progress');
+    const progressFill = document.getElementById('preprocess-progress-fill');
+    const statusText = document.getElementById('preprocess-status');
+    const [source, ...nameParts] = document.getElementById('stats-select').value.split(':');
 
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading"></span> Processing...';
-    progressContainer.style.display = 'block';
+    const finish = () => { runBusy.preprocess = false; refreshRunButtons(); };
+    runBusy.preprocess = true;
+    refreshRunButtons();
+    btn.querySelector('.btn-run-label').textContent = 'Preprocessing…';
     outputContainer.style.display = 'none';
-    gallery.style.display = 'none';
 
     try {
-        // Upload images
-        statusText.textContent = 'Uploading images...';
-        patchStatusText.textContent = 'Waiting...';
-        setProgress(progressFill, 5);
-        setProgress(patchProgressFill, 0);
-
-        const formData = new FormData();
-        Array.from(files).forEach(file => formData.append('files', file));
-
-        const uploadResponse = await fetch('/api/upload-images', {
+        const response = await fetch('/api/preprocess-images', {
             method: 'POST',
-            body: formData
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                project_id: PyProjects.currentId(),
+                drawings: PyProjects.selected('preprocess'),
+                stats_source: source,
+                stats_name: nameParts.join(':')
+            })
         });
+        const resp = await response.json();
+        if (!resp.success) throw new Error(resp.error || 'Could not start preprocessing');
 
-        if (!uploadResponse.ok) throw new Error('Upload failed');
+        progressContainer.style.display = 'block';
+        setProgress(progressFill, 3);
+        statusText.textContent = 'Checking drawings...';
 
-        // Handle custom model upload if selected
-        if (modelName === 'custom') {
-            const customModelFile = document.getElementById('custom-model-file').files[0];
-            if (!customModelFile) {
-                throw new Error('Please select a custom model file');
+        followRun(resp.session_id, {
+            onProgress(data) {
+                if (data.progress !== undefined) setProgress(progressFill, data.progress);
+                if (data.message) statusText.textContent = data.message;
+            },
+            onDone(results) {
+                progressContainer.style.display = 'none';
+                const parts = [`<strong>${results.adjusted}</strong> corrected`];
+                if (results.unchanged.length) parts.push(`<strong>${results.unchanged.length}</strong> already in range (they keep using the original)`);
+                let html = `<div class="message message-success"><i class="bi bi-check-circle-fill"></i> <span>${parts.join(' · ')}, with ${escapeHtml(results.stats)}.</span></div>`;
+                if (results.failed.length) {
+                    html += `<div class="message message-warning"><i class="bi bi-exclamation-triangle-fill"></i> <span>Could not read: ${results.failed.map(f => escapeHtml(f.name)).join(', ')}</span></div>`;
+                }
+                outputContainer.innerHTML = html;
+                outputContainer.style.display = 'block';
+                PyProjects.refresh();
+                finish();
+            },
+            onError(message) {
+                progressContainer.style.display = 'none';
+                showMessage('error', escapeHtml(message), outputContainer);
+                finish();
             }
+        });
+    } catch (error) {
+        showMessage('error', escapeHtml(error.message), outputContainer);
+        finish();
+    }
+});
 
-            statusText.textContent = 'Uploading custom model...';
-            setProgress(progressFill, 8);
+// Batch inking with the local model: the run takes the whole screen until it ends or is stopped
+const localRun = (() => {
+    const $ = id => document.getElementById(id);
+    const modal = $('local-modal');
+    let sessionId = null, finished = true, startedAt = 0, total = 0, fraction = 0, fractionAt = 0, timer = null;
 
-            const modelFormData = new FormData();
-            modelFormData.append('model', customModelFile);
-
-            const modelUploadResponse = await fetch('/api/upload-custom-model', {
-                method: 'POST',
-                body: modelFormData
-            });
-
-            if (!modelUploadResponse.ok) {
-                const error = await modelUploadResponse.json();
-                throw new Error(error.error || 'Custom model upload failed');
-            }
+    function fmtClock(sec) {
+        sec = Math.max(0, Math.round(sec));
+        const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = String(sec % 60).padStart(2, '0');
+        return h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+    }
+    function tick() {
+        $('local-stat-time').textContent = fmtClock((Date.now() - startedAt) / 1000);
+        if (!finished && fraction > 0.02) {
+            // time per unit of work so far, applied to what is left
+            const left = (fractionAt - startedAt) / 1000 / fraction * (1 - fraction) - (Date.now() - fractionAt) / 1000;
+            $('local-stat-eta').textContent = left > 1 ? `about ${fmtClock(left)} left` : 'almost done';
         }
+    }
+    function message(kind, html) {
+        const box = $('local-run-message');
+        box.className = `cloud-run-message is-${kind}`;
+        box.innerHTML = html;
+        box.style.display = 'block';
+    }
+    function open(count) {
+        finished = false; sessionId = null; total = count; fraction = 0;
+        $('local-run-status').textContent = `Inking ${count} drawing${count === 1 ? '' : 's'}`;
+        $('local-run-current').textContent = 'Preparing...';
+        setProgress($('local-run-fill'), 0);
+        setProgress($('local-patch-fill'), 0);
+        $('local-patch-status').textContent = '';
+        document.querySelector('#local-modal .run-screen-patch').hidden = false;
+        $('local-run-bar').setAttribute('aria-valuenow', '0');
+        $('local-stat-done').textContent = `0 / ${count}`;
+        $('local-stat-eta').textContent = '';
+        $('local-run-message').style.display = 'none';
+        const stop = $('local-stop-btn');
+        stop.style.display = '';
+        stop.disabled = true;   // enabled once the server has the run
+        $('local-open-folder-btn').style.display = 'none';
+        $('local-view-btn').style.display = 'none';
+        $('local-modal-close').style.display = 'none';
+        modal.style.display = 'flex';
+        startedAt = Date.now();
+        clearInterval(timer);
+        timer = setInterval(tick, 1000);
+        tick();
+    }
+    function started(id) {
+        sessionId = id;
+        $('local-stop-btn').disabled = false;
+    }
+    function progress(data) {
+        if (finished) return;
+        if (data.message) $('local-run-current').textContent = data.message;
+        if (data.patch_progress !== undefined) {
+            setProgress($('local-patch-fill'), data.patch_progress);
+            $('local-patch-status').textContent = data.patch_message || '';
+        }
+        if (data.progress !== undefined) {
+            setProgress($('local-run-fill'), data.progress);
+            $('local-run-bar').setAttribute('aria-valuenow', String(Math.round(data.progress)));
+            $('local-stat-done').textContent = `${Math.min(total, Math.floor(data.progress * total / 100 + 1e-6))} / ${total}`;
+            // the patch bar refines the estimate inside the drawing being inked
+            const within = data.patch_progress !== undefined && data.progress < 100 ? data.patch_progress / 100 / total : 0;
+            fraction = Math.min(1, data.progress / 100 + within);
+            fractionAt = Date.now();
+        }
+    }
+    function end() {
+        finished = true;
+        clearInterval(timer);
+        tick();
+        $('local-stat-eta').textContent = '';
+        document.querySelector('#local-modal .run-screen-patch').hidden = true;
+        $('local-stop-btn').style.display = 'none';
+        $('local-modal-close').style.display = '';
+    }
+    function done(results) {
+        end();
+        const notStarted = results.not_started || 0;
+        $('local-run-status').textContent = notStarted ? 'Stopped' : 'Done';
+        $('local-run-current').textContent = '';
+        $('local-stat-done').textContent = `${results.successful} / ${total}`;
+        setProgress($('local-run-fill'), 100 * (total - notStarted) / total);
+        const failed = results.failed ? ` ${results.failed} failed.` : '';
+        const stopped = notStarted ? ` ${notStarted} not started: they are still in “To ink”.` : '';
+        const reasons = (results.errors || []).map(r => `<br><code>${escapeHtml(r)}</code>`).join('');
+        if (!results.successful && results.failed) {
+            $('local-run-status').textContent = 'Nothing was inked';
+            message('error', `All ${results.failed} drawings failed.${stopped} The error:${reasons}`);
+        } else {
+            message(results.failed || notStarted ? 'warning' : 'success',
+                `${results.successful} drawing${results.successful === 1 ? '' : 's'} inked.${failed}${stopped}${results.failed ? reasons : ''}`);
+        }
+        $('local-open-folder-btn').style.display = results.successful ? '' : 'none';
+        const view = $('local-view-btn');
+        view.style.display = results.successful ? '' : 'none';
+        if (results.successful) view.focus();
+    }
+    function fail(text) {
+        end();
+        $('local-run-status').textContent = 'The run stopped';
+        $('local-run-current').textContent = '';
+        message('error', escapeHtml(text));
+    }
+    function close() {
+        if (!finished) return;
+        modal.style.display = 'none';
+    }
 
-        // Check and download model if needed (for non-custom models)
-        statusText.textContent = 'Checking model...';
-        setProgress(progressFill, 10);
+    $('local-stop-btn').addEventListener('click', async function () {
+        if (!sessionId || finished) return;
+        this.disabled = true;
+        $('local-run-status').textContent = 'Stopping...';
+        $('local-run-current').textContent = 'Finishing the drawing being inked; the ones done so far are kept';
+        try { await fetch(`/api/process-images/stop/${sessionId}`, { method: 'POST' }); } catch (e) { /* the run ends on its own */ }
+    });
+    $('local-open-folder-btn').addEventListener('click', openBatchOutputFolder);
+    $('local-view-btn').addEventListener('click', () => {
+        close();
+        document.getElementById('process-output').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    $('local-modal-close').addEventListener('click', close);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.style.display === 'flex') close(); });
 
-        // Only check model if not custom
-        if (modelName !== 'custom') {
-            const modelCheckResponse = await fetch('/api/check-model', {
+    return { open, started, progress, done, fail };
+})();
+
+document.getElementById('process-images-btn').addEventListener('click', async function () {
+    if (runBusy.local) return;
+    const drawings = await PyProjects.confirmRerun('local', PyProjects.selected('local'));
+    if (!drawings || !drawings.length) return;
+    const modelName = document.getElementById('process-model-select').value;
+    const btn = this;
+    const outputContainer = document.getElementById('process-output');
+    const gallery = document.getElementById('process-gallery');
+    const status = text => localRun.progress({ message: text });
+
+    const finish = () => { runBusy.local = false; refreshRunButtons(); };
+    runBusy.local = true;
+    refreshRunButtons();
+    btn.querySelector('.btn-run-label').textContent = 'Inking…';
+    outputContainer.style.display = 'none';
+    gallery.style.display = 'none';
+    localRun.open(drawings.length);
+
+    try {
+        if (modelName === 'custom') {
+            status('Uploading custom model...');
+            await uploadCustomModel('custom-model-file');
+        } else {
+            status('Checking model...');
+            const modelCheck = await (await fetch('/api/check-model', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model_name: modelName })
-            });
-
-            const modelCheck = await modelCheckResponse.json();
-            if (!modelCheck.success) {
-                throw new Error('Model not available: ' + modelCheck.error);
-            }
+            })).json();
+            if (!modelCheck.success) throw new Error('Model not available: ' + modelCheck.error);
         }
 
-        // Check if diffusion model (sd-turbo) is cached
-        statusText.textContent = 'Checking diffusion model...';
-        setProgress(progressFill, 12);
-
-        const diffusionCheckResponse = await fetch('/api/check-diffusion-model');
-        const diffusionCheck = await diffusionCheckResponse.json();
-
-        // If sd-turbo is not cached, show download overlay and simulate progress
-        // The actual download happens when the model is loaded
+        status('Checking diffusion model...');
+        const diffusionCheck = await (await fetch('/api/check-diffusion-model')).json();
         if (!diffusionCheck.cached) {
             showDownloadOverlay('Downloading stabilityai/sd-turbo components. This is a one-time download (~5GB).');
-            // Don't await the simulation - let it run in the background
-            // The overlay will be hidden when processing starts successfully
         }
 
-        // Start processing
-        statusText.textContent = 'Starting processing...';
-        setProgress(progressFill, 15);
-
-        const processResponse = await fetch('/api/process-images', {
+        status('Loading the model...');
+        const customFile = document.getElementById('custom-model-file').files[0];
+        const response = await fetch('/api/process-images', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                project_id: PyProjects.currentId(),
+                drawings,
+                use_preprocessed: document.getElementById('process-use-pre').checked,
                 model_name: modelName,
-                output_dir: outputDir,
-                use_fp16: useFp16,
-                contrast_scale: parseFloat(contrastScale),
-                patch_size: parseInt(patchSize),
-                overlap: parseInt(overlap),
-                upscale: parseFloat(upscale)
+                custom_model_name: modelName === 'custom' && customFile ? customFile.name : '',
+                use_fp16: document.getElementById('use-fp16').checked,
+                contrast_scale: parseFloat(document.getElementById('process-contrast').value),
+                patch_size: parseInt(document.getElementById('process-patch-size').value),
+                overlap: parseInt(document.getElementById('process-overlap').value),
+                upscale: parseFloat(document.getElementById('process-upscale').value)
             })
         });
+        const processData = await response.json();
+        if (!processData.success) throw new Error(processData.error || 'Could not start processing');
+        localRun.started(processData.session_id);
 
-        const processData = await processResponse.json();
-
-        if (!processData.success) {
-            throw new Error('Failed to start processing: ' + processData.error);
-        }
-
-        // Listen to progress updates via Server-Sent Events
-        const sessionId = processData.session_id;
-        const eventSource = new EventSource(`/api/progress/${sessionId}`);
-
-        eventSource.onmessage = function (event) {
-            const data = JSON.parse(event.data);
-
-            if (data.keepalive) {
-                // Just a keepalive, ignore
-                return;
+        followRun(processData.session_id, {
+            onProgress: localRun.progress,
+            onDone(results) {
+                renderBatchResults(results, outputContainer, gallery);
+                localRun.done(results);
+                PyProjects.refresh();   // the run is now in the project history, and the drawings are marked inked
+                finish();
+            },
+            onError(message) {
+                localRun.fail(message);
+                showMessage('error', escapeHtml(message), outputContainer);
+                finish();
             }
-
-            // Model-download progress (style .pkl or the shared sd-turbo
-            // backbone) drives the overlay's real progress bar instead of
-            // the main processing progress bar, and doesn't mean processing
-            // has actually started yet.
-            if (data.type === 'style_model_download' || data.type === 'sdturbo_download') {
-                showDownloadOverlay(data.type === 'sdturbo_download'
-                    ? 'Downloading stabilityai/sd-turbo components. This is a one-time download (~5GB).'
-                    : 'Downloading style model...');
-                updateDownloadProgress(data.progress, data.message);
-                return;
-            }
-
-            // Any other message means real processing progress has begun -
-            // hide the download overlay if it was showing.
-            hideDownloadOverlay();
-
-            if (data.error) {
-                showMessage('error', data.message, outputContainer);
-                eventSource.close();
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Start Processing';
-                return;
-            }
-
-            // Update overall progress bar and status
-            if (data.progress !== undefined) {
-                const progress = Math.min(Math.max(data.progress, 0), 100);
-                setProgress(progressFill, progress);
-                statusText.textContent = data.message || 'Processing...';
-            }
-
-            // Update patch progress bar and status
-            if (data.patch_progress !== undefined) {
-                const patchProgress = Math.min(Math.max(data.patch_progress, 0), 100);
-                setProgress(patchProgressFill, patchProgress);
-                patchStatusText.textContent = data.patch_message || 'Processing patches...';
-            }
-
-            // If completed
-            if (data.completed && data.results) {
-                eventSource.close();
-
-                const results = data.results;
-                let html = '<div class="message message-success"><i class="bi bi-check-circle-fill"></i> Processing completed successfully!</div>';
-                html += '<h3>Results Summary:</h3>';
-                html += `<p><strong><i class="bi bi-check-circle-fill" style="color: var(--teal);"></i> Successful:</strong> ${results.successful} images</p>`;
-                html += `<p><strong><i class="bi bi-x-circle-fill" style="color: var(--danger-color);"></i> Failed:</strong> ${results.failed} images</p>`;
-                html += `<p><strong><i class="bi bi-stopwatch"></i> Average time:</strong> ${results.average_time.toFixed(2)}s per image</p>`;
-                html += `<p><strong><i class="bi bi-folder2-open"></i> Output directory:</strong> <code>${results.output_dir}</code></p>`;
-                lastBatchOutputDir = results.output_dir;
-                html += `<button class="btn btn-open-folder" type="button" onclick="openBatchOutputFolder()"><i class="bi bi-folder2-open"></i> Open Output Folder</button>`;
-
-                if (results.log_file) {
-                    html += `<p><strong><i class="bi bi-file-earmark-text"></i> Log file:</strong> <code>${results.log_file}</code></p>`;
-                }
-
-                outputContainer.innerHTML = html;
-                outputContainer.style.display = 'block';
-
-                // Display comparison images if available
-                if (results.comparison_images && results.comparison_images.length > 0) {
-                    gallery.innerHTML = '<h3>Comparison Images:</h3>';
-                    const galleryDiv = document.createElement('div');
-                    galleryDiv.className = 'gallery';
-
-                    results.comparison_images.slice(0, 20).forEach(file => {
-                        const img = document.createElement('img');
-                        img.loading = 'lazy';
-                        img.decoding = 'async';
-                        img.src = `/api/get-image/comparisons/${file}`;
-                        img.alt = file;
-                        img.onclick = function () { openLightbox(this.src); };
-                        galleryDiv.appendChild(img);
-                    });
-
-                    gallery.appendChild(galleryDiv);
-                    gallery.style.display = 'block';
-
-                    if (results.comparison_images.length > 20) {
-                        const note = document.createElement('p');
-                        note.textContent = `Showing 20 of ${results.comparison_images.length} comparison images`;
-                        note.style.color = '#666';
-                        gallery.appendChild(note);
-                    }
-                }
-
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Start Processing';
-            }
-        };
-
-        eventSource.onerror = function () {
-            eventSource.close();
-            showMessage('error', 'Connection lost. Processing may still continue in background.', outputContainer);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Start Processing';
-        };
-
+        });
     } catch (error) {
-        showMessage('error', 'Error: ' + error.message, outputContainer);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-play-circle-fill"></i> Start Processing';
-        progressContainer.style.display = 'none';
+        hideDownloadOverlay();
+        localRun.fail(error.message);
+        showMessage('error', escapeHtml(error.message), outputContainer);
+        finish();
     }
 });
+
+function renderBatchResults(results, outputContainer, gallery) {
+    const failed = results.failed ? ` · <strong>${results.failed}</strong> failed` : '';
+    const stopped = results.not_started ? ` · stopped, <strong>${results.not_started}</strong> not started` : '';
+    const reasons = (results.errors || []).map(r => `<br><code>${escapeHtml(r)}</code>`).join('');
+    let html = results.successful
+        ? `<div class="message ${results.failed ? 'message-warning' : 'message-success'}"><i class="bi bi-check-circle-fill"></i> <span><strong>${results.successful}</strong> inked${failed}${stopped} · ${results.average_time.toFixed(1)} s per drawing${results.failed ? reasons : ''}</span></div>`
+        : `<div class="message message-error"><i class="bi bi-x-circle-fill"></i> <span>Nothing was inked: <strong>${results.failed}</strong> failed.${reasons}</span></div>`;
+    html += '<dl class="result-facts">';
+    (results.folders || []).forEach(f => { html += `<dt>Folder</dt><dd><code>outputs/${escapeHtml(f)}</code></dd>`; });
+    if (results.external) {
+        html += results.external.error
+            ? `<dt>External copy</dt><dd class="is-failed">failed (${escapeHtml(results.external.error)}); the results are complete in the project</dd>`
+            : `<dt>External copy</dt><dd>${results.external.copied} files in <code>${escapeHtml(results.external.dir)}</code></dd>`;
+    }
+    html += '</dl>';
+    lastBatchOutputDir = results.output_dir;
+    if (results.successful) html += `<button class="btn btn-primary btn-view-results" type="button" onclick="openBatchOutputFolder()"><i class="bi bi-folder2-open"></i> Open the results folder</button>`;
+    outputContainer.innerHTML = html;
+    outputContainer.style.display = 'block';
+
+    const comparisons = results.comparison_images || [];
+    gallery.replaceChildren();
+    if (!comparisons.length) { gallery.style.display = 'none'; return; }
+    const title = document.createElement('h3');
+    title.className = 'group-title';
+    title.textContent = 'Pencil and ink, side by side';
+    const grid = document.createElement('div');
+    grid.className = 'gallery';
+    comparisons.slice(0, 20).forEach(rel => {
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.src = PyProjects.fileUrl('outputs', rel);
+        img.alt = rel.split('/').pop();
+        img.onclick = function () { openLightbox(this.src); };
+        grid.appendChild(img);
+    });
+    gallery.append(title, grid);
+    if (comparisons.length > 20) {
+        const note = document.createElement('p');
+        note.className = 'field-note';
+        note.textContent = `Showing 20 of ${comparisons.length}. All of them are in the folder.`;
+        gallery.appendChild(note);
+    }
+    gallery.style.display = 'block';
+}
+
+function escapeHtml(text) {
+    const node = document.createElement('div');
+    node.textContent = String(text);
+    return node.innerHTML;
+}
 
 function showMessage(type, message, container) {
     const messageClass = `message message-${type}`;
@@ -939,247 +848,6 @@ function showMessage(type, message, container) {
     container.innerHTML = `<div class="${messageClass}">${icon} <span>${message}</span></div>`;
     container.style.display = 'block';
 }
-
-// Stats file upload toggle
-// Stats file upload toggle - Removed to keep it always visible
-// document.getElementById('use-calculated-stats').addEventListener('change', function () {
-//     const statsFileGroup = document.getElementById('stats-file-group');
-//     statsFileGroup.style.display = this.checked ? 'none' : 'block';
-// });
-
-// Initialize image upload area with preview
-function initImageUpload(areaId, inputId, previewId) {
-    const uploadArea = document.getElementById(areaId);
-    const fileInput = document.getElementById(inputId);
-    const previewContainer = document.getElementById(previewId);
-
-    if (!uploadArea || !fileInput || !previewContainer) return;
-
-    let selectedFiles = [];
-    let selectionId = 0;                 // bumps on every new selection, stale thumbnail jobs stop
-    const thumbCache = new Map();        // File -> thumbnail canvas (null when it could not be decoded)
-    const thumbsInFlight = new Set();
-    const tileByFile = new Map();
-    const MAX_PREVIEW_TILES = 60;
-    const THUMB_WIDTH = 240;
-    const THUMB_CONCURRENCY = 4;
-
-    // Click to upload
-    uploadArea.addEventListener('click', function (e) {
-        if (!e.target.classList.contains('preview-item-remove')) {
-            fileInput.click();
-        }
-    });
-
-    // File selection
-    fileInput.addEventListener('change', function () {
-        handleFiles(this.files);
-    });
-
-    // Drag and drop
-    uploadArea.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.classList.add('dragover');
-    });
-
-    uploadArea.addEventListener('dragleave', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.classList.remove('dragover');
-    });
-
-    uploadArea.addEventListener('drop', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.classList.remove('dragover');
-
-        const files = e.dataTransfer.files;
-        handleFiles(files);
-    });
-
-    // Preview of the selected files. With hundreds of scans the old version read every file as a full-size
-    // base64 image and rebuilt the whole grid on every removal. Now: small bitmaps (decoded off the main
-    // thread, 4 at a time), at most MAX_PREVIEW_TILES tiles, one delegated remove handler.
-    function handleFiles(files) {
-        selectedFiles = Array.from(files);
-        selectionId++;
-        thumbCache.clear();
-        syncFileInput();
-        renderPreview();
-    }
-
-    function syncFileInput() {
-        const dataTransfer = new DataTransfer();
-        selectedFiles.forEach(file => dataTransfer.items.add(file));
-        fileInput.files = dataTransfer.files;
-    }
-
-    function isTiffFile(file) {
-        const name = file.name.toLowerCase();
-        return name.endsWith('.tif') || name.endsWith('.tiff');
-    }
-
-    function placeholderThumb(label) {
-        const box = document.createElement('div');
-        box.className = 'tiff-placeholder preview-thumb';
-        box.innerHTML = '<div class="tiff-icon"><i class="bi bi-file-earmark-image"></i></div><div class="tiff-label"></div>';
-        box.querySelector('.tiff-label').textContent = label;
-        return box;
-    }
-
-    function fileLabel(file) {
-        const dot = file.name.lastIndexOf('.');
-        return dot >= 0 ? file.name.slice(dot + 1).toUpperCase() : 'IMG';
-    }
-
-    function buildTile(file, index) {
-        const item = document.createElement('div');
-        item.className = 'preview-item';
-
-        const cached = thumbCache.get(file);
-        if (cached) {
-            item.appendChild(cached);
-        } else if (cached === null || isTiffFile(file)) {
-            item.appendChild(placeholderThumb(fileLabel(file)));
-        } else {
-            const pending = document.createElement('div');
-            pending.className = 'preview-thumb preview-thumb-pending';
-            item.appendChild(pending);
-        }
-
-        const name = document.createElement('div');
-        name.className = 'preview-item-name';
-        name.textContent = file.name;
-        item.appendChild(name);
-
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'preview-item-remove';
-        remove.dataset.index = index;
-        remove.setAttribute('aria-label', 'Remove image');
-        remove.innerHTML = '<i class="bi bi-x"></i>';
-        item.appendChild(remove);
-        return item;
-    }
-
-    function renderPreview() {
-        if (selectedFiles.length === 0) {
-            previewContainer.replaceChildren();
-            previewContainer.style.display = 'none';
-            uploadArea.querySelector('.upload-placeholder').style.display = 'flex';
-            updateButtonStates(areaId);
-            return;
-        }
-
-        uploadArea.querySelector('.upload-placeholder').style.display = 'none';
-        previewContainer.style.display = 'grid';
-
-        const fragment = document.createDocumentFragment();
-        const visible = selectedFiles.slice(0, MAX_PREVIEW_TILES);
-        tileByFile.clear();
-        visible.forEach((file, index) => {
-            const tile = buildTile(file, index);
-            tileByFile.set(file, tile);
-            fragment.appendChild(tile);
-        });
-
-        const hidden = selectedFiles.length - visible.length;
-        if (hidden > 0) {
-            const more = document.createElement('div');
-            more.className = 'preview-item preview-more';
-            more.textContent = `+${hidden} more`;
-            fragment.appendChild(more);
-        }
-
-        const countDiv = document.createElement('div');
-        countDiv.className = 'upload-count';
-        countDiv.textContent = `${selectedFiles.length} image${selectedFiles.length > 1 ? 's' : ''} selected`;
-        fragment.appendChild(countDiv);
-
-        previewContainer.replaceChildren(fragment);
-        loadThumbnails(visible);
-        updateButtonStates(areaId);
-    }
-
-    async function makeThumbnail(file) {
-        const bitmap = await createImageBitmap(file, { resizeWidth: THUMB_WIDTH, resizeQuality: 'low' });
-        const canvas = document.createElement('canvas');
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        canvas.getContext('2d').drawImage(bitmap, 0, 0);
-        bitmap.close();
-        canvas.className = 'preview-thumb';
-        canvas.setAttribute('role', 'img');
-        canvas.setAttribute('aria-label', file.name);
-        return canvas;
-    }
-
-    // Decode the missing thumbnails of the visible tiles, a few at a time
-    function loadThumbnails(visibleFiles) {
-        const queue = visibleFiles.filter(f => !isTiffFile(f) && !thumbCache.has(f) && !thumbsInFlight.has(f));
-        const mySelection = selectionId;
-
-        const worker = async () => {
-            while (queue.length > 0 && mySelection === selectionId) {
-                const file = queue.shift();
-                thumbsInFlight.add(file);
-                let thumb = null;
-                try {
-                    thumb = await makeThumbnail(file);
-                } catch (err) {
-                    // unreadable or unsupported: the tile keeps the file-type placeholder
-                }
-                thumbsInFlight.delete(file);
-                if (mySelection !== selectionId) return;
-                thumbCache.set(file, thumb);
-                const tile = tileByFile.get(file);
-                const slot = tile && tile.querySelector('.preview-thumb');
-                if (slot) slot.replaceWith(thumb || placeholderThumb(fileLabel(file)));
-            }
-        };
-        for (let i = 0; i < THUMB_CONCURRENCY; i++) worker();
-    }
-
-    previewContainer.addEventListener('click', function (e) {
-        const btn = e.target.closest('.preview-item-remove');
-        if (!btn) return;
-        e.stopPropagation();
-        removeFile(parseInt(btn.dataset.index, 10));
-    });
-
-    function removeFile(index) {
-        const [removed] = selectedFiles.splice(index, 1);
-        thumbCache.delete(removed);
-        syncFileInput();
-        renderPreview();
-    }
-
-    function updateButtonStates(areaId) {
-        const hasFiles = selectedFiles.length > 0;
-
-        if (areaId === 'stats-upload-area') {
-            document.getElementById('calculate-stats-btn').disabled = !hasFiles;
-        } else if (areaId === 'preprocess-upload-area') {
-            document.getElementById('preprocess-btn').disabled = !hasFiles;
-        } else if (areaId === 'diag-upload-area') {
-            document.getElementById('run-diagnostics-btn').disabled = !hasFiles;
-        } else if (areaId === 'process-upload-area') {
-            document.getElementById('process-images-btn').disabled = !hasFiles;
-        } else if (areaId === 'cloud-upload-area') {
-            document.dispatchEvent(new CustomEvent('cloud-files', { detail: selectedFiles.length }));
-        }
-    }
-}
-
-// Initialize all upload areas on load
-document.addEventListener('DOMContentLoaded', function () {
-    initImageUpload('stats-upload-area', 'stats-image-upload', 'stats-preview');
-    initImageUpload('preprocess-upload-area', 'preprocess-image-upload', 'preprocess-preview');
-    initImageUpload('diag-upload-area', 'diag-image-upload', 'diag-preview');
-    initImageUpload('process-upload-area', 'process-image-upload', 'process-preview');
-    initImageUpload('cloud-upload-area', 'cloud-image-upload', 'cloud-preview');
-});
 
 // Copy Citation Helper Function
 window.copyCitation = function (elementId = 'citation-text', btnElement) {
@@ -1273,6 +941,14 @@ if (infoModalEl) {
     });
 }
 
+// The select shows only the model names; what each model is for goes in the note under it
+document.querySelectorAll('select.model-select').forEach(select => {
+    const note = document.getElementById(select.getAttribute('aria-describedby').split(' ')[0]);
+    const show = () => { note.textContent = select.selectedOptions[0]?.dataset.desc || ''; };
+    select.addEventListener('change', show);
+    show();
+});
+
 // Custom Model Selection Handler - Processing Tab
 document.getElementById('process-model-select').addEventListener('change', function () {
     const customModelUpload = document.getElementById('custom-model-upload');
@@ -1280,10 +956,10 @@ document.getElementById('process-model-select').addEventListener('change', funct
 
     if (this.value === 'custom') {
         customModelUpload.style.display = 'block';
-        modelStatus.textContent = 'Select a custom .pkl model file from your computer';
+        modelStatus.textContent = 'Results go to a folder named after the model file.';
     } else {
         customModelUpload.style.display = 'none';
-        modelStatus.textContent = 'Model will be automatically downloaded if not present';
+        modelStatus.textContent = 'Downloaded automatically the first time.';
     }
 });
 
@@ -1295,94 +971,6 @@ document.getElementById('diag-model-select').addEventListener('change', function
         customModelUpload.style.display = 'block';
     } else {
         customModelUpload.style.display = 'none';
-    }
-});
-
-// Directory Browser - Processing Tab
-document.getElementById('browse-output-dir').addEventListener('click', async function () {
-    const btn = this;
-    const input = document.getElementById('process-output-dir');
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading"></span> Opening...';
-
-    try {
-        const response = await fetch('/api/select-directory', {
-            method: 'POST'
-        });
-
-        const data = await response.json();
-
-        if (data.success && data.directory) {
-            input.value = data.directory;
-        } else {
-            console.log('No directory selected');
-        }
-    } catch (error) {
-        console.error('Error selecting directory:', error);
-        alert('Error opening directory picker: ' + error.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-folder2-open"></i> Browse...';
-    }
-});
-
-// Directory Browser - Preprocessing Tab
-document.getElementById('browse-preprocess-dir').addEventListener('click', async function () {
-    const btn = this;
-    const input = document.getElementById('preprocess-output-dir');
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading"></span> Opening...';
-
-    try {
-        const response = await fetch('/api/select-directory', {
-            method: 'POST'
-        });
-
-        const data = await response.json();
-
-        if (data.success && data.directory) {
-            input.value = data.directory;
-        } else {
-            console.log('No directory selected');
-        }
-    } catch (error) {
-        console.error('Error selecting directory:', error);
-        alert('Error opening directory picker: ' + error.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-folder2-open"></i> Browse...';
-    }
-});
-
-// Directory Browser - Statistics Save Path
-document.getElementById('browse-stats-path').addEventListener('click', async function () {
-    const btn = this;
-    const input = document.getElementById('stats-save-path');
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading"></span> Opening...';
-
-    try {
-        const response = await fetch('/api/select-directory', {
-            method: 'POST'
-        });
-
-        const data = await response.json();
-
-        if (data.success && data.directory) {
-            // Add the default filename to the selected directory
-            input.value = data.directory + '/custom_stats.npy';
-        } else {
-            console.log('No directory selected');
-        }
-    } catch (error) {
-        console.error('Error selecting directory:', error);
-        alert('Error opening directory picker: ' + error.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-folder2-open"></i> Browse...';
     }
 });
 
@@ -1506,6 +1094,70 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
         return Number.isFinite(v) ? Math.min(Math.max(v, 1), MAX_VARIANTS) : 1;
     }
 
+    // ---- optional style reference ---------------------------------------------
+    const REF_SLOTS = { pair: ['pencil', 'ink'], sheet: ['sheet'], style: ['style'] };
+    const refSlotsBox = $('cloud-ref-slots');
+    const refHint = $('cloud-ref-hint');
+    const refSection = $('cloud-ref-section');
+
+    function refMode() {
+        const el = document.querySelector('input[name="cloud-ref-mode"]:checked');
+        return el ? el.value : 'none';
+    }
+
+    function refInput(slot) { return $('cloud-ref-' + slot); }
+
+    function refComplete() {
+        const mode = refMode();
+        if (mode === 'none') return true;
+        return REF_SLOTS[mode].every(slot => refInput(slot).files.length > 0);
+    }
+
+    function refreshRef() {
+        const mode = refMode();
+        refSlotsBox.style.display = mode === 'none' ? 'none' : 'grid';
+        refSlotsBox.querySelectorAll('.cloud-ref-slot').forEach(el => {
+            el.style.display = el.dataset.mode === mode ? '' : 'none';
+        });
+        refHint.textContent = {
+            pair: 'Use a pencil drawing and the inked version of that same drawing, ideally in the style you want for the whole batch.',
+            sheet: 'One image with the pencil drawing on the left and its inked version on the right.',
+            style: 'One finished ink drawing, with no pencil version: the model copies its line weights and stippling, never its shapes.',
+        }[mode] || '';
+        refSection.classList.toggle('has-reference', mode !== 'none');
+        refreshGate();
+    }
+
+    document.querySelectorAll('input[name="cloud-ref-mode"]').forEach(el => el.addEventListener('change', refreshRef));
+    document.querySelectorAll('.cloud-ref-slot input[type="file"]').forEach(input => {
+        input.addEventListener('change', () => {
+            const slot = input.parentElement;
+            const thumb = slot.querySelector('.cloud-ref-thumb');
+            if (thumb.dataset.url) URL.revokeObjectURL(thumb.dataset.url);
+            delete thumb.dataset.url;
+            const file = input.files[0];
+            if (file && !/\.tiff?$/i.test(file.name)) {
+                thumb.dataset.url = URL.createObjectURL(file);
+                thumb.src = thumb.dataset.url;
+                thumb.alt = file.name;
+                thumb.hidden = false;
+            } else {
+                thumb.hidden = true;
+            }
+            slot.querySelector('.cloud-ref-remove').hidden = !file;
+            refreshGate();
+        });
+    });
+    // Remove: empty the slot so another image can be chosen (clearing the input fires no change event)
+    document.querySelectorAll('.cloud-ref-remove').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const input = btn.parentElement.querySelector('input[type="file"]');
+            input.value = '';
+            input.dispatchEvent(new Event('change'));
+            input.focus();
+        });
+    });
+
     function modelIdValid() {
         return modelSel.value !== 'custom' || /^[\w.\-]+\/[\w.\-:]+$/.test(customInput.value.trim());
     }
@@ -1533,8 +1185,13 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
         if (!keyInput.value.trim()) missing.push('your API key');
         if (!consent.checked) missing.push('the privacy notice');
         if (!modelIdValid()) missing.push('a valid model id');
-        if (fileCount === 0) missing.push('at least one drawing');
+        if (!refComplete()) missing.push({ pair: 'both reference images', sheet: 'the reference sheet', style: 'the reference drawing' }[refMode()]);
+        if (fileCount === 0) missing.push('drawings selected from the project');
         startBtn.disabled = running || missing.length > 0;
+        startBtn.querySelector('.btn-run-label').textContent = fileCount
+            ? `Ink ${fileCount} drawing${fileCount === 1 ? '' : 's'} in the cloud` : 'Ink in the cloud';
+        // the connection block folds away once it is complete
+        $('cloud-connection').classList.toggle('is-ready', !!keyInput.value.trim() && consent.checked);
         startHint.textContent = missing.length
             ? `To continue: ${missing.join(', ')}.`
             : 'Each image is sent to the provider as soon as you press Start.';
@@ -1545,8 +1202,9 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
         refreshGate();
     }
 
-    document.addEventListener('cloud-files', e => {
-        fileCount = e.detail || 0;
+    document.addEventListener('picker-change', e => {
+        if (e.detail.mode !== 'cloud') return;
+        fileCount = e.detail.count || 0;
         refreshAll();
     });
     [keyInput, consent, customInput].forEach(el => el.addEventListener('input', refreshGate));
@@ -1562,22 +1220,6 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
         refreshAll();
     });
     customInput.addEventListener('input', refreshEstimate);
-
-    $('browse-cloud-dir').addEventListener('click', async function () {
-        const btn = this;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="loading"></span> Opening...';
-        try {
-            const response = await fetch('/api/select-directory', { method: 'POST' });
-            const data = await response.json();
-            if (data.success && data.directory) $('cloud-output-dir').value = data.directory;
-        } catch (error) {
-            alert('Error opening directory picker: ' + error.message);
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-folder2-open"></i> Browse...';
-        }
-    });
 
     // ---- run modal -------------------------------------------------------------
     let timer = null;
@@ -1674,6 +1316,7 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
         cancelBtn.style.display = 'none';
         closeBtn.style.display = '';
         refreshGate();
+        if (results) PyProjects.refresh();   // the run is now in the project history
 
         if (!results) {
             $('cloud-run-status').textContent = 'Something went wrong';
@@ -1693,6 +1336,11 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
         } else {
             $('cloud-run-status').textContent = 'Done';
             showRunMessage('success', `${results.successful} image${results.successful === 1 ? '' : 's'} saved. Total cost ${fmtUsd(results.cost_usd)}.`);
+        }
+        if (results.external) {
+            $('cloud-run-message').textContent += results.external.error
+                ? ` The copy in your external folder failed (${results.external.error}); the results are complete in the project.`
+                : ` ${results.external.copied} copied to your external folder.`;
         }
         $('cloud-run-current').textContent = '';
         $('cloud-stat-cost').textContent = fmtUsd(results.cost_usd);
@@ -1716,20 +1364,23 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
         p(`<strong><i class="bi bi-coin"></i> Cost:</strong> ${fmtUsd(results.cost_usd)}` +
           (results.has_tokens ? ` &middot; ${fmtInt(results.tokens_in)} input and ${fmtInt(results.tokens_out)} output tokens` : ''));
         p(`<strong><i class="bi bi-stopwatch"></i> Average time:</strong> ${results.average_time.toFixed(1)} s per image`);
-        const dir = document.createElement('p');
-        dir.innerHTML = '<strong><i class="bi bi-folder2-open"></i> Output directory:</strong> <code></code>';
-        dir.querySelector('code').textContent = results.output_dir;
-        box.appendChild(dir);
-        if (results.log_file) {
-            const log = document.createElement('p');
-            log.innerHTML = '<strong><i class="bi bi-file-earmark-text"></i> Log file:</strong> <code></code>';
-            log.querySelector('code').textContent = results.log_file;
-            box.appendChild(log);
+        (results.folders || []).forEach(folder => {
+            const dir = document.createElement('p');
+            dir.innerHTML = '<strong><i class="bi bi-folder2-open"></i> Folder:</strong> <code></code>';
+            dir.querySelector('code').textContent = `outputs/${folder}`;
+            box.appendChild(dir);
+        });
+        if (results.external) {
+            const ext = document.createElement('p');
+            ext.textContent = results.external.error
+                ? `The copy in your external folder failed (${results.external.error}); the results are complete in the project.`
+                : `${results.external.copied} files also copied to ${results.external.dir}.`;
+            box.appendChild(ext);
         }
         const folderBtn = document.createElement('button');
         folderBtn.type = 'button';
         folderBtn.className = 'btn btn-open-folder';
-        folderBtn.innerHTML = '<i class="bi bi-folder2-open"></i> Open Output Folder';
+        folderBtn.innerHTML = '<i class="bi bi-folder2-open"></i> Open folder';
         folderBtn.addEventListener('click', () => openFolder(lastOutputDir));
         box.appendChild(folderBtn);
         box.style.display = 'block';
@@ -1753,11 +1404,12 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
             name.textContent = source;
             const row = document.createElement('div');
             row.className = 'cloud-item-row';
-            row.appendChild(figure(`/api/get-image/input/${encodeURIComponent(source)}?t=${stamp}`, 'Pencil', source));
+            row.appendChild(figure(`${PyProjects.fileUrl(versions[0].input_path.split('/')[0], versions[0].input_path.split('/').slice(1).join('/'))}?t=${stamp}`,
+                versions[0].input_path.startsWith('preprocessed/') ? 'Pencil (preprocessed)' : 'Pencil', source));
             versions.forEach(v => {
                 const cap = (versions.length > 1 ? `Version ${v.variant}` : 'Ink') +
                     (v.seconds ? ` · ${v.seconds} s` : '') + (v.cost_usd !== '' && v.cost_usd != null ? ` · ${Number(v.cost_usd).toFixed(3)} $` : '');
-                row.appendChild(figure(`/api/get-image/output/${encodeURIComponent(v.file)}?t=${stamp}`, cap, v.file));
+                row.appendChild(figure(`${PyProjects.fileUrl('outputs', v.output_path)}?t=${stamp}`, cap, v.file));
             });
             wrap.append(name, row);
             list.appendChild(wrap);
@@ -1784,19 +1436,26 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
     // ---- start / cancel ------------------------------------------------------
     startBtn.addEventListener('click', async function () {
         if (running) return;
-        const files = $('cloud-image-upload').files;
+        const drawings = await PyProjects.confirmRerun('cloud', PyProjects.selected('cloud'));
+        if (!drawings || drawings.length === 0) return;
         running = true;
         refreshGate();
         outputBox.style.display = 'none';
         gallery.style.display = 'none';
         openModal();
-        $('cloud-run-status').textContent = 'Uploading drawings...';
+        $('cloud-run-status').textContent = 'Preparing...';
 
         try {
-            const formData = new FormData();
-            Array.from(files).forEach(file => formData.append('files', file));
-            const up = await fetch('/api/upload-images', { method: 'POST', body: formData });
-            if (!up.ok) throw new Error('Upload failed');
+            const reference = refMode();
+            if (reference !== 'none') {
+                $('cloud-run-status').textContent = 'Uploading the reference...';
+                const refForm = new FormData();
+                refForm.append('mode', reference);
+                REF_SLOTS[reference].forEach(slot => refForm.append(slot, refInput(slot).files[0]));
+                const refRes = await fetch('/api/cloud/upload-reference', { method: 'POST', body: refForm });
+                const refData = await refRes.json();
+                if (!refData.success) throw new Error(refData.error || 'Reference upload failed');
+            }
 
             const response = await fetch('/api/cloud/start', {
                 method: 'POST',
@@ -1804,14 +1463,18 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
                 body: JSON.stringify({
                     api_key: keyInput.value.trim(),
                     consent: consent.checked,
+                    project_id: PyProjects.currentId(),
+                    drawings,
+                    use_preprocessed: $('cloud-use-pre').checked,
+                    reference_hash: await PyProjects.referenceHash(),
                     model: modelSel.value,
                     custom_model: customInput.value.trim(),
                     style: selectedStyle(),
+                    reference: reference,
                     variants: variants(),
                     extra_prompt: $('cloud-extra-prompt').value,
                     align: $('cloud-align').checked,
-                    budget_usd: $('cloud-budget').value,
-                    output_dir: $('cloud-output-dir').value
+                    budget_usd: $('cloud-budget').value
                 })
             });
             const data = await response.json();
@@ -1853,5 +1516,6 @@ document.getElementById('browse-stats-path').addEventListener('click', async fun
     closeBtn.addEventListener('click', closeModal);
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.style.display === 'flex') closeModal(); });
 
+    refreshRef();
     refreshAll();
 })();
